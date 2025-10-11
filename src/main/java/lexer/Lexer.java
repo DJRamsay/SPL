@@ -82,6 +82,7 @@ public class Lexer {
         KEYWORDS.put("minus", TokenType.MINUS);
         KEYWORDS.put("mult", TokenType.MULT);
         KEYWORDS.put("div", TokenType.DIV);
+        KEYWORDS.put("gt", TokenType.GT);
     }
     
     private Token scanIdentifierOrKeyword() throws LexerException {
@@ -100,16 +101,12 @@ public class Lexer {
         }
         
         lexeme.append(advance());
-        
-        while (isLetter(peek())) {
+
+        // Allow mixed letters and digits in any order, not just letters followed by digits
+        while (isLetter(peek()) || isDigit(peek())) {
             lexeme.append(advance());
         }
-        
-        // Then optional digits
-        while (isDigit(peek())) {
-            lexeme.append(advance());
-        }
-        
+
         String text = lexeme.toString();
         
         // Check if it's a keyword
