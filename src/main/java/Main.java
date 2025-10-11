@@ -1,5 +1,6 @@
-import lexer.*;
 import java.util.List;
+import lexer.*;
+
 import java.io.*;
 public class Main {
     //Input mechamism to feed into main???
