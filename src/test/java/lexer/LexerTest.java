@@ -38,6 +38,16 @@ public class LexerTest {
         assertEquals(TokenType.IDENTIFIER, tokens.get(0).getType());
         assertEquals("var123", tokens.get(0).getLexeme());
     }
+
+    @Test
+    public void testIdentifier_MixedLettersDigits() throws LexerException {
+        lexer = new Lexer("a1b2c3"); // Mixed pattern
+        List<Token> tokens = lexer.tokenize();
+
+        assertEquals(2, tokens.size()); // identifier + EOF
+        assertEquals(TokenType.IDENTIFIER, tokens.get(0).getType());
+        assertEquals("a1b2c3", tokens.get(0).getLexeme());
+    }
     
     @Test
     public void testIdentifierSingleLetter() throws LexerException {
@@ -73,6 +83,12 @@ public class LexerTest {
     public void testIdentifierWithUppercase_ThrowsException() throws LexerException {
         lexer = new Lexer("Abc");
         lexer.tokenize(); // Should throw - only lowercase allowed
+    }
+
+    @Test(expected = LexerException.class)
+    public void testNumber_ZeroThenDigit_ThrowsException() throws LexerException {
+        lexer = new Lexer("01a"); // This should throw can't start with digit
+        lexer.tokenize();
     }
     
     // ============================================================
@@ -467,6 +483,19 @@ public class LexerTest {
         assertEquals(TokenType.RPAREN, tokens.get(7).getType());
         assertEquals(TokenType.RPAREN, tokens.get(8).getType());
     }
+
+    @Test
+    public void testComplexExpression_AllOperators() throws LexerException {
+        lexer = new Lexer("(a eq b) and (x gt y) or not z");
+        List<Token> tokens = lexer.tokenize();
+
+        assertEquals(15, tokens.size());
+        assertEquals(TokenType.EQ, tokens.get(2).getType());
+        assertEquals(TokenType.AND, tokens.get(5).getType());
+        assertEquals(TokenType.GT, tokens.get(8).getType());
+        assertEquals(TokenType.OR, tokens.get(11).getType());
+        assertEquals(TokenType.NOT, tokens.get(12).getType());
+    }
     
     @Test
     public void testMiniProgram() throws LexerException {
@@ -535,4 +564,34 @@ public class LexerTest {
         assertEquals(1, tokens.size());
         assertEquals(TokenType.EOF, tokens.get(0).getType());
     }
+
+    // ============================================================
+    // Error Message Content Tests
+    // ============================================================
+    @Test
+    public void testErrorMessages_ContainPosition() {
+        try {
+            lexer = new Lexer("0123");
+            lexer.tokenize();
+            fail("Should have thrown exception");
+        } catch (LexerException e) {
+            assertTrue(e.getMessage().contains("line"));
+            assertTrue(e.getMessage().contains("column"));
+            assertTrue(e.getMessage().contains("leading zero"));
+        }
+    }
+
+    @Test
+    public void testErrorMessages_InvalidCharacter() {
+        try {
+            lexer = new Lexer("x = @");
+            lexer.tokenize();
+            fail("Should have thrown exception");
+        } catch (LexerException e) {
+            assertTrue(e.getMessage().contains("Unexpected character"));
+            assertTrue(e.getMessage().contains("@")); // Shows the problematic char
+        }
+    }
 }
+
+    
