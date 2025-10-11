@@ -102,7 +102,7 @@ public class Lexer {
         
         lexeme.append(advance());
 
-        //reading letters and digits so not just letter then digits
+        // Allow mixed letters and digits in any order, not just letters followed by digits
         while (isLetter(peek()) || isDigit(peek())) {
             lexeme.append(advance());
         }
