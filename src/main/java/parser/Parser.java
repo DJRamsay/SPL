@@ -1,6 +1,7 @@
 package parser;
 
 import java.util.List;
+
 import lexer.Token;
 import lexer.TokenType;
 
@@ -153,12 +154,22 @@ public class Parser {
         throw new ParserException("Expected an OUTPUT (ATOM or string literal).");
     }
 
-    // VARIABLES ::= VAR NAME ; VARIABLES | epsilon
+    // VARIABLES ::= VAR NAME ; VARIABLES | IDENTIFIER [ ; ]* | epsilon
     private void parseVARIABLES() throws ParserException {
-        // Looks for zero or more 'var NAME ;' sequences
+        // First: accept zero or more 'var NAME ;' sequences (existing behaviour)
         while (match(TokenType.VAR)) {
             parseNAME(); // Variable name
             expect(TokenType.SEMICOLON, "Expected ';' after VAR declaration.");
+        }
+
+        // Second: also allow a simple list of bare IDENTIFIER names (e.g., glob { x y z })
+        // Each name may optionally be followed by a semicolon. Stop when we hit a non-IDENTIFIER.
+        while (check(TokenType.IDENTIFIER)) {
+            parseNAME();
+            // consume an optional semicolon between bare names
+            if (check(TokenType.SEMICOLON)) {
+                advance();
+            }
         }
     }
 
