@@ -33,19 +33,28 @@ public class SyntaxNode {
         return Collections.unmodifiableList(children);
     }
 
- 
+    /**
+     * Backwards-compatible print method (delegates to pretty printer).
+     * Keep the same signature so existing calls remain valid.
+     */
     public void print(int indent) {
         printTree();
     }
 
-    
+    /**
+     * Pretty-print the tree using ASCII connectors and zero-padded ids.
+     * Example:
+     * Program (id=0001)
+     * ├─ glob (id=0002)
+     * │  └─ x (id=0003)
+     * └─ main (id=0004)
+     */
     public void printTree() {
         printTree("", true);
     }
 
-    // internal recursive printer
+    // Internal recursive printer: prefix is accumulated, isTail marks last child.
     private void printTree(String prefix, boolean isTail) {
-        // Root node prints without leading connector when prefix is empty and isTail==true
         String connector = prefix.isEmpty() ? "" : (isTail ? "└─ " : "├─ ");
         System.out.printf("%s%s (id=%04d)%n", prefix + connector, label, id);
 
@@ -55,7 +64,6 @@ public class SyntaxNode {
             SyntaxNode child = kids.get(i);
             String childPrefix;
             if (prefix.isEmpty()) {
-                // top-level: no leading vertical bar yet
                 childPrefix = last ? "    " : "│   ";
             } else {
                 childPrefix = prefix + (isTail ? "    " : "│   ");
