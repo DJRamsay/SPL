@@ -1,0 +1,11 @@
+glob { var a ; var b ; var result ; }
+proc { }
+func { add (x y) { local { var sum ; } sum = (x plus y) ; return sum } }
+main {
+  var { }
+  a = 5 ;
+  b = 3 ;
+  result = add (a b) ;
+  print result ;
+  halt
+}

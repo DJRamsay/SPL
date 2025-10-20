@@ -1,6 +1,4 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.List;
 
 import lexer.Lexer;
@@ -10,36 +8,17 @@ import parser.Parser;
 import parser.ParserException;
 import parser.SyntaxNode;
 import parser.SyntaxTreeBuilder;
+
 public class Main {
-    //Input mechamism to feed into main???
 
     public static void main(String args[]) throws IOException{
-        String source = null;
-        BufferedReader consoleIn = new BufferedReader(new InputStreamReader(System.in));
+        String source;
 
         try {
             if (args.length < 1){
-                System.out.println("No input file provided.");
-                System.out.println("Choose an option:");
-                System.out.println("  1) Paste source (end with a line containing only EOF)");
-                System.out.println("  2) Enter file path");
-                System.out.print("Enter 1 or 2: ");
-                String choice = consoleIn.readLine();
-
-                if ("2".equals(choice)) {
-                    System.out.print("Enter file path: ");
-                    String path = consoleIn.readLine();
-                    source = readFile(path);
-                } else {
-                    System.out.println("Paste source now. End with a line containing only EOF:");
-                    StringBuilder sb = new StringBuilder();
-                    String line;
-                    while ((line = consoleIn.readLine()) != null) {
-                        if (line.equals("EOF")) break;
-                        sb.append(line).append(System.lineSeparator());
-                    }
-                    source = sb.toString();
-                }
+                String defaultInput = "src/main/java/parser/input.txt";
+                System.out.println("No arguments provided. Reading from " + defaultInput);
+                source = readFile(defaultInput);
             } else {
                 source = readFile(args[0]);
             }
