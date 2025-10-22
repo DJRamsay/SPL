@@ -536,33 +536,27 @@ public class ScopeAnalyzer {
     }
     
     // LOOP ::= while TERM { ALGO } | do { ALGO } until TERM
-    private void analyzeLOOP() throws ScopeException {
-        if (match(TokenType.WHILE)) {
-            expect(TokenType.LPAREN, "Expected '(' after while");
-            analyzeTERM();
-            expect(TokenType.RPAREN, "Expected ')' after while condition");
-            expect(TokenType.LBRACE, "Expected '{' for while body");
-            analyzeALGO();
-            expect(TokenType.RBRACE, "Expected '}' after while body");
-        } else if (match(TokenType.DO)) {
-            expect(TokenType.LBRACE, "Expected '{' after do");
-            analyzeALGO();
-            expect(TokenType.RBRACE, "Expected '}' after do body");
-            expect(TokenType.UNTIL, "Expected 'until' after do body");
-            expect(TokenType.LPAREN, "Expected '(' after until");
-            analyzeTERM();
-            expect(TokenType.RPAREN, "Expected ')' after until condition");
-        } else {
-            throw new ScopeException("Expected 'while' or 'do' for loop");
-        }
+   private void analyzeLOOP() throws ScopeException {
+    if (match(TokenType.WHILE)) {
+        analyzeTERM();
+        expect(TokenType.LBRACE, "Expected '{' for while body");
+        analyzeALGO();
+        expect(TokenType.RBRACE, "Expected '}' after while body");
+    } else if (match(TokenType.DO)) {
+        expect(TokenType.LBRACE, "Expected '{' after do");
+        analyzeALGO();
+        expect(TokenType.RBRACE, "Expected '}' after do body");
+        expect(TokenType.UNTIL, "Expected 'until' after do body");
+        analyzeTERM();
+    } else {
+        throw new ScopeException("Expected 'while' or 'do' for loop");
     }
+}
     
     // BRANCH ::= if TERM { ALGO } [ else { ALGO } ]
     private void analyzeBRANCH() throws ScopeException {
         expect(TokenType.IF, "Expected 'if'");
-        expect(TokenType.LPAREN, "Expected '(' after if");
         analyzeTERM();
-        expect(TokenType.RPAREN, "Expected ')' after if condition");
         expect(TokenType.LBRACE, "Expected '{' for if body");
         analyzeALGO();
         expect(TokenType.RBRACE, "Expected '}' after if body");
@@ -652,6 +646,7 @@ public class ScopeAnalyzer {
         }
         throw new ScopeException("Expected binary operator");
     }
+
     
     // =========================================================================
     // Semantic Checking Helpers
