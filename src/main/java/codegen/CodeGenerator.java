@@ -249,44 +249,62 @@ public class CodeGenerator {
     }
 
     private Expr parseTermExpr() {
-        // TERM ::= ATOM | ( UNOP TERM ) | ( TERM BINOP TERM )
-        if (check(TokenType.NUMBER)) {
-            return new Expr(advance().getLexeme());
+        // TERM := primary (BINOP TERM)?
+        Expr left = parsePrimary();
+        if (isBinOpPeek()) {
+            String op = readBinOp();
+            Expr right = parseTermExpr(); // right-recursive; fine for our grammar
+            return new Expr(op, left, right);
         }
-        if (check(TokenType.IDENTIFIER)) {
-            // function call as term: name ( INPUT )
-            if (lookAheadLex("(")) {
-                String name = advance().getLexeme();
-                List<String> args = parseInputList();
-                // Represent CALL as atom-ish string "CALL name arg1 arg2"
-                String call = "CALL " + name + joinArgs(args);
-                return new Expr(call);
-            }
-            return new Expr(advance().getLexeme());
-        }
+        return left;
+    }
+ 
+    // primary := number | identifier | CALL | ( UNOP TERM ) | ( TERM )
+    private Expr parsePrimary() {
         if (matchLex("(")) {
-            // UNOP?
             if (checkLex("neg") || checkLex("not")) {
                 String op = advance().getLexeme();
                 Expr t = parseTermExpr();
                 expectLex(")", "Expected ')' after unary TERM");
                 return new Expr(op, t, null);
             }
-            // ( TERM BINOP TERM )
-            Expr left = parseTermExpr();
-            String op = parseBinOp();
-            Expr right = parseTermExpr();
-            expectLex(")", "Expected ')' to close TERM");
-            return new Expr(op, left, right);
+            Expr e = parseTermExpr();
+            expectLex(")", "Expected ')' to close group");
+            return e;
+        }
+        if (check(TokenType.NUMBER)) {
+            return new Expr(advance().getLexeme());
+        }
+        if (check(TokenType.IDENTIFIER)) {
+            if (lookAheadLex("(")) {
+                String name = advance().getLexeme();
+                List<String> args = parseInputList();
+                String call = "CALL " + name + joinArgs(args);
+                return new Expr(call);
+            }
+            return new Expr(advance().getLexeme());
         }
         throw error("Invalid TERM at " + where());
     }
 
-    private String parseBinOp() {
-        if (checkLex("plus") || checkLex("minus") || checkLex("mult") || checkLex("div")
-            || checkLex("eq") || checkLex(">") || checkLex("or") || checkLex("and")) {
-            return advance().getLexeme();
-        }
+    // Prefer token-type checks to avoid lexeme edge cases
+    private boolean isBinOpPeek() {
+        return check(TokenType.PLUS) || check(TokenType.MINUS) || check(TokenType.MULT) || check(TokenType.DIV)
+            || check(TokenType.EQ) || check(TokenType.GT) || check(TokenType.OR) || check(TokenType.AND)
+            || checkLex("plus") || checkLex("minus") || checkLex("mult") || checkLex("div")
+            || checkLex("eq") || checkLex(">") || checkLex("or") || checkLex("and");
+    }
+
+    // Consume BINOP and normalize to the string the emitter expects
+    private String readBinOp() {
+        if (match(TokenType.PLUS) || matchLex("plus")) return "plus";
+        if (match(TokenType.MINUS) || matchLex("minus")) return "minus";
+        if (match(TokenType.MULT) || matchLex("mult")) return "mult";
+        if (match(TokenType.DIV) || matchLex("div")) return "div";
+        if (match(TokenType.EQ) || matchLex("eq")) return "eq";
+        if (match(TokenType.GT) || matchLex(">")) return ">";
+        if (match(TokenType.OR) || matchLex("or")) return "or";
+        if (match(TokenType.AND) || matchLex("and")) return "and";
         throw error("Expected binary operator at " + where());
     }
 
@@ -446,6 +464,11 @@ public class CodeGenerator {
     private boolean check(TokenType type) {
         if (isAtEnd()) return false;
         return peek().getType() == type;
+    }
+
+    private boolean match(TokenType type) {
+        if (check(type)) { advance(); return true; }
+        return false;
     }
 
     private Token advance() {
