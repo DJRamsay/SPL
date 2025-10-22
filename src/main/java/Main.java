@@ -1,13 +1,13 @@
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import codegen.CodeGenerator;
 import lexer.Lexer;
 import lexer.LexerException;
 import lexer.Token;
 import parser.Parser;
 import parser.ParserException;
-import parser.SyntaxNode;
-import parser.SyntaxTreeBuilder;
 
 public class Main {
 
@@ -16,7 +16,7 @@ public class Main {
 
         try {
             if (args.length < 1){
-                String defaultInput = "src/main/java/parser/input.txt";
+                String defaultInput = "src/main/java/input.txt";
                 System.out.println("No arguments provided. Reading from " + defaultInput);
                 source = readFile(defaultInput);
             } else {
@@ -45,14 +45,20 @@ public class Main {
             // === parsing step ===
             System.out.println("====Parsing====");
             try {
-                Parser parser = new Parser(tokens); // adjust if your Parser uses a different ctor
-                parser.parse(); // adjust if method name differs
+                Parser parser = new Parser(tokens);
+                parser.parse();
                 System.out.println("Parse successful");
 
-                // Build and print a simple syntax tree from the token stream
-                System.out.println("====Syntax Tree====");
-                SyntaxNode tree = new SyntaxTreeBuilder(tokens).build();
-                tree.print(0);
+                // === Code Generation ===
+                System.out.println("====Target Code====");
+                CodeGenerator gen = new CodeGenerator(tokens);
+                String target = gen.generate();
+                System.out.println(target);
+
+                // Save target code (ASCII) as .txt file
+                String outPath = "target/target_code.txt";
+                writeFile(outPath, target);
+                System.out.println("Saved target code to: " + outPath);
 
             } catch (ParserException pe) {
                 System.err.println("Parse error: " + pe.getMessage());
@@ -76,8 +82,13 @@ public class Main {
     
     private static void writeFile(String path, String content) 
             throws IOException {
+        var p = java.nio.file.Paths.get(path);
+        var parent = p.getParent();
+        if (parent != null) {
+            java.nio.file.Files.createDirectories(parent);
+        }
         java.nio.file.Files.write(
-            java.nio.file.Paths.get(path), 
-            content.getBytes());
+            p,
+            content.getBytes(StandardCharsets.US_ASCII));
     }
 }
