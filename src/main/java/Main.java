@@ -66,6 +66,26 @@ public class Main {
             }
             // === end added parsing step ===
 
+            // === Scope Analysis ===
+            System.out.println("====Scope Analysis====");
+            try {
+                semantic.ScopeAnalyzer scopeAnalyzer = new semantic.ScopeAnalyzer(tokens);
+                semantic.ScopeAnalyzer.ScopeAnalysisResult scopeResult = scopeAnalyzer.analyze();
+                
+                if (scopeResult.isSuccess()) {
+                    System.out.println("Variable Naming and Function Naming accepted");
+                } else {
+                    System.err.println("Naming errors found:");
+                    for (String error : scopeResult.getErrors()) {
+                        System.err.println("  - " + error);
+                    }
+                    System.exit(1);
+                }
+            } catch (Exception e) {
+                System.err.println("Scope analysis error: " + e.getMessage());
+                System.exit(1);
+            }
+
         } catch (LexerException e) {
             System.err.println("Compilation error: " + e.getMessage());
             System.exit(1);
