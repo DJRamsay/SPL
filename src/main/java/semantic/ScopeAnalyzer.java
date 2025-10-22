@@ -536,22 +536,22 @@ public class ScopeAnalyzer {
     }
     
     // LOOP ::= while TERM { ALGO } | do { ALGO } until TERM
-   private void analyzeLOOP() throws ScopeException {
-    if (match(TokenType.WHILE)) {
-        analyzeTERM();
-        expect(TokenType.LBRACE, "Expected '{' for while body");
-        analyzeALGO();
-        expect(TokenType.RBRACE, "Expected '}' after while body");
-    } else if (match(TokenType.DO)) {
-        expect(TokenType.LBRACE, "Expected '{' after do");
-        analyzeALGO();
-        expect(TokenType.RBRACE, "Expected '}' after do body");
-        expect(TokenType.UNTIL, "Expected 'until' after do body");
-        analyzeTERM();
-    } else {
-        throw new ScopeException("Expected 'while' or 'do' for loop");
+    private void analyzeLOOP() throws ScopeException {
+        if (match(TokenType.WHILE)) {
+            analyzeTERM();
+            expect(TokenType.LBRACE, "Expected '{' for while body");
+            analyzeALGO();
+            expect(TokenType.RBRACE, "Expected '}' after while body");
+        } else if (match(TokenType.DO)) {
+            expect(TokenType.LBRACE, "Expected '{' after do");
+            analyzeALGO();
+            expect(TokenType.RBRACE, "Expected '}' after do body");
+            expect(TokenType.UNTIL, "Expected 'until' after do body");
+            analyzeTERM();
+        } else {
+            throw new ScopeException("Expected 'while' or 'do' for loop");
+        }
     }
-}
     
     // BRANCH ::= if TERM { ALGO } [ else { ALGO } ]
     private void analyzeBRANCH() throws ScopeException {
