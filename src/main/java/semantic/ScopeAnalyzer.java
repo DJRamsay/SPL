@@ -259,7 +259,26 @@ public class ScopeAnalyzer {
     private void analyzeVARIABLES() throws ScopeException {
         Set<String> declaredNames = new HashSet<>();
         
-        while (check(TokenType.VAR) || check(TokenType.IDENTIFIER)) {
+        //if we immediately see RBRACE, it's an empty variables block
+        if (check(TokenType.RBRACE)) {
+            return;
+        }
+        
+        while (true) {
+            // Check if we've reached the end of the variables block
+            if (check(TokenType.RBRACE)) {
+                break;
+            }
+            
+            // Check for valid variable declaration start
+            if (!check(TokenType.VAR) && !check(TokenType.IDENTIFIER)) {
+                // If we're not at the end and don't see a variable, it's an error
+                if (!check(TokenType.RBRACE)) {
+                    throw new ScopeException("Expected variable declaration or '}' but found " + peek().getType() + " at " + where());
+                }
+                break;
+            }
+            
             Token name;
             if (check(TokenType.VAR)) {
                 advance(); // consume 'var' if present
@@ -292,6 +311,11 @@ public class ScopeAnalyzer {
     
     // PROCDEFS ::= PDEF PROCDEFS | epsilon
     private void analyzePROCDEFS() throws ScopeException {
+        // Handle epsilon case - empty procedures block
+        if (check(TokenType.RBRACE)) {
+            return;
+        }
+        
         Set<String> declaredProcedures = new HashSet<>();
         
         while (check(TokenType.IDENTIFIER)) {
@@ -304,6 +328,10 @@ public class ScopeAnalyzer {
             declaredProcedures.add(procName);
             
             analyzePDEF();
+            
+            if (check(TokenType.RBRACE)) {
+                break;
+            }
         }
     }
     
@@ -339,6 +367,11 @@ public class ScopeAnalyzer {
     
     // FUNCDEFS ::= FDEF FUNCDEFS | epsilon
     private void analyzeFUNCDEFS() throws ScopeException {
+        // Handle epsilon case - empty functions block
+        if (check(TokenType.RBRACE)) {
+            return;
+        }
+        
         Set<String> declaredFunctions = new HashSet<>();
         
         while (check(TokenType.IDENTIFIER)) {
@@ -351,6 +384,11 @@ public class ScopeAnalyzer {
             declaredFunctions.add(funcName);
             
             analyzeFDEF();
+            
+            // Check if we've reached the end of the functions block
+            if (check(TokenType.RBRACE)) {
+                break;
+            }
         }
     }
     
@@ -428,6 +466,11 @@ public class ScopeAnalyzer {
         Set<String> names = new HashSet<>();
         int count = 0;
         
+        // Handle epsilon case - empty MAXTHREE block
+        if (check(TokenType.RBRACE)) {
+            return names;
+        }
+        
         while ((check(TokenType.VAR) || check(TokenType.IDENTIFIER)) && count < 3) {
             Token name;
             if (check(TokenType.VAR)) {
@@ -445,6 +488,10 @@ public class ScopeAnalyzer {
             }
             names.add(varName);
             count++;
+            
+            if (check(TokenType.RBRACE)) {
+                break;
+            }
         }
         
         return names;
