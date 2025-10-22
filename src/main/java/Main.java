@@ -1,23 +1,70 @@
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
-import lexer.*;
 
-import java.io.*;
+import codegen.CodeGenerator;
+import lexer.Lexer;
+import lexer.LexerException;
+import lexer.Token;
+import parser.Parser;
+import parser.ParserException;
+
 public class Main {
-    //Input mechamism to feed into main???
 
-    public static void main(String args[]){
-        if (args.length < 1){
-            System.err.println("Empty Input");
-            System.exit(1);
-        }
+    public static void main(String args[]) throws IOException{
+        String source;
 
         try {
-            String source =  readFile(args[0]);
+            if (args.length < 1){
+                String defaultInput = "src/main/java/input.txt";
+                System.out.println("No arguments provided. Reading from " + defaultInput);
+                source = readFile(defaultInput);
+            } else {
+                source = readFile(args[0]);
+            }
 
             System.out.println("====Lexical Analysis====");
             Lexer lexer =  new Lexer(source);
             List<Token> tokens =  lexer.tokenize();
-            System.out.println("Token generated: " + tokens.size());
+            System.out.println("Tokens generated: " + tokens.size());
+
+            // Debug: print source with line numbers
+            System.out.println("---- Source (numbered) ----");
+            String[] _lines = source.split("\\R");
+            for (int i = 0; i < _lines.length; i++) {
+                System.out.printf("%3d: %s%n", i + 1, _lines[i]);
+            }
+
+            // Debug: print tokens (uses Token.toString())
+            System.out.println("---- Tokens ----");
+            for (Token t : tokens) {
+                System.out.println(t);
+            }
+            System.out.println("---- End Tokens ----");
+            
+            // === parsing step ===
+            System.out.println("====Parsing====");
+            try {
+                Parser parser = new Parser(tokens);
+                parser.parse();
+                System.out.println("Parse successful");
+
+                // === Code Generation ===
+                System.out.println("====Target Code====");
+                CodeGenerator gen = new CodeGenerator(tokens);
+                String target = gen.generate();
+                System.out.println(target);
+
+                // Save target code (ASCII) as .txt file
+                String outPath = "target/target_code.txt";
+                writeFile(outPath, target);
+                System.out.println("Saved target code to: " + outPath);
+
+            } catch (ParserException pe) {
+                System.err.println("Parse error: " + pe.getMessage());
+                System.exit(1);
+            }
+            // === end added parsing step ===
 
         } catch (LexerException e) {
             System.err.println("Compilation error: " + e.getMessage());
@@ -35,8 +82,13 @@ public class Main {
     
     private static void writeFile(String path, String content) 
             throws IOException {
+        var p = java.nio.file.Paths.get(path);
+        var parent = p.getParent();
+        if (parent != null) {
+            java.nio.file.Files.createDirectories(parent);
+        }
         java.nio.file.Files.write(
-            java.nio.file.Paths.get(path), 
-            content.getBytes());
+            p,
+            content.getBytes(StandardCharsets.US_ASCII));
     }
 }
