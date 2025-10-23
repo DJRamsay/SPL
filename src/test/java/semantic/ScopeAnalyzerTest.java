@@ -532,4 +532,472 @@ public class ScopeAnalyzerTest {
 
         assertTrue("Procedure call should be valid", result.isSuccess());
     }
+    
+    /**
+     * TEST 13: Procedure with parameters
+     */
+    @Test
+    public void testProcedureWithParameters() {
+        List<Token> tokens = createTokens(
+            TokenType.GLOB, "glob",
+            TokenType.LBRACE, "{",
+            TokenType.RBRACE, "}",
+            TokenType.PROC, "proc",
+            TokenType.LBRACE, "{",
+            TokenType.IDENTIFIER, "myproc",
+            TokenType.LPAREN, "(",
+            TokenType.IDENTIFIER, "x",
+            TokenType.IDENTIFIER, "y",
+            TokenType.RPAREN, ")",
+            TokenType.LBRACE, "{",
+            TokenType.LOCAL, "local",
+            TokenType.LBRACE, "{",
+            TokenType.RBRACE, "}",
+            TokenType.HALT, "halt",
+            TokenType.RBRACE, "}",
+            TokenType.RBRACE, "}",
+            TokenType.FUNC, "func",
+            TokenType.LBRACE, "{",
+            TokenType.RBRACE, "}",
+            TokenType.MAIN, "main",
+            TokenType.LBRACE, "{",
+            TokenType.VAR, "var",
+            TokenType.LBRACE, "{",
+            TokenType.RBRACE, "}",
+            TokenType.HALT, "halt",
+            TokenType.RBRACE, "}",
+            TokenType.EOF, ""
+        );
+        
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Procedure with parameters should be valid", result.isSuccess());
+        assertTrue("Should have no errors, but found: " + result.getErrors(), result.getErrors().isEmpty());
+    }
+
+   /**
+     * TEST 14: Variable-Function name conflict (should fail)
+     */
+@Test
+public void testVariableFunctionNameConflict() throws Exception {
+    String source = "glob { myfunc ; } proc { } func { myfunc ( ) { local { } ; return 1 } } main { var { } halt }";
+    List<Token> tokens = new Lexer(source).tokenize();
+    
+    // DEBUG: Print all tokens
+    System.out.println("=== ALL TOKENS ===");
+    for (int i = 0; i < tokens.size(); i++) {
+        Token t = tokens.get(i);
+        if (t.getType() != TokenType.EOF) {
+            System.out.printf("%2d: %-15s '%s' at %d:%d%n", 
+                i, t.getType(), t.getLexeme(), t.getLine(), t.getColumn());
+        }
+    }
+    
+    ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+    ScopeAnalysisResult result = analyzer.analyze();
+    
+    // DEBUG: Print symbol table and errors
+    analyzer.debugSymbolTable();
+    if (!result.isSuccess()) {
+        System.out.println("Errors found:");
+        for (String error : result.getErrors()) {
+            System.out.println("  - " + error);
+        }
+    } else {
+        System.out.println("No errors found - but there should be a naming conflict!");
+    }
+    
+    assertFalse("Variable-function name conflict should fail", result.isSuccess());
+    assertFalse("Should have errors due to name conflict", result.getErrors().isEmpty());
+}
+
+
+    /**
+     * TEST 15: Procedure-Function name conflict (should fail)
+     */
+    @Test
+    public void testProcedureFunctionNameConflict() throws Exception {
+        String source = "glob { } proc { myname ( ) { local { } halt } } func { myname ( ) { local { } ; return 1 } } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertFalse("Procedure-function name conflict should fail", result.isSuccess());
+        assertFalse("Should have errors due to name conflict", result.getErrors().isEmpty());
+    }
+
+    /**
+     * TEST 16: Shadowing parameter with local variable (should fail)
+     */
+    @Test
+    public void testShadowingParameterWithLocal() throws Exception {
+        String source = "glob { } proc { myproc ( x ) { local { x ; } halt } } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        
+        // DEBUG: Print tokens around the procedure
+        System.out.println("=== TOKENS AROUND PROCEDURE ===");
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if (t.getType() != TokenType.EOF && i >= 5 && i <= 20) {
+                System.out.printf("%2d: %-15s '%s' at %d:%d%n", 
+                    i, t.getType(), t.getLexeme(), t.getLine(), t.getColumn());
+            }
+        }
+        
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        if (!result.isSuccess()) {
+            System.out.println("Errors found:");
+            for (String error : result.getErrors()) {
+                System.out.println("  - " + error);
+            }
+        } else {
+            System.out.println("No errors found - but shadowing should be detected!");
+            analyzer.debugSymbolTable();
+        }
+        
+        assertFalse("Shadowing parameters should fail", result.isSuccess());
+        assertFalse("Should have errors due to shadowing", result.getErrors().isEmpty());
+    }
+
+    /**
+     * TEST 17: Valid same name in different scopes (should pass)
+     */
+    @Test
+    public void testSameNameInDifferentScopes() throws Exception {
+        String source = "glob { x ; } proc { myproc ( ) { local { x ; } x = 1 ; } } func { } main { var { x ; } x = 2 ; halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        // DEBUG: Print symbol table and errors
+        analyzer.debugSymbolTable();
+        if (!result.isSuccess()) {
+            System.out.println("Errors found:");
+            for (String error : result.getErrors()) {
+                System.out.println("  - " + error);
+            }
+        }
+        
+        assertTrue("Same name in different scopes should be allowed", result.isSuccess());
+    }
+
+    /**
+     * TEST 18: Valid parameter usage
+     */
+    @Test
+    public void testValidParameterUsage() throws Exception {
+        String source = "glob { } proc { myproc ( a b ) { local { } a = 1 ; b = 2 ; } } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Parameter usage should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 19: Valid function with return
+     */
+    @Test
+    public void testValidFunctionReturn() throws Exception {
+        String source = "glob { } proc { } func { myfunc ( ) { local { } ; return 1 } } main { var { x ; } x = myfunc ( ) ; halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Function with return should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 20: Max three parameters (should pass)
+     */
+    @Test
+    public void testMaxThreeParameters() throws Exception {
+        String source = "glob { } proc { myproc ( a b c ) { local { } halt } } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Three parameters should be allowed", result.isSuccess());
+    }
+
+    /**
+     * TEST 21: Max three local variables (should pass)
+     */
+    @Test
+    public void testMaxThreeLocals() throws Exception {
+        String source = "glob { } proc { myproc ( ) { local { x y z ; } halt } } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        
+        // DEBUG: Print tokens around the local block
+        System.out.println("=== TOKENS AROUND LOCAL BLOCK ===");
+        for (int i = 0; i < tokens.size(); i++) {
+            Token t = tokens.get(i);
+            if (t.getType() != TokenType.EOF && i >= 10 && i <= 20) { // Focus on local block area
+                System.out.printf("%2d: %-15s '%s' at %d:%d%n", 
+                    i, t.getType(), t.getLexeme(), t.getLine(), t.getColumn());
+            }
+        }
+        
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        if (!result.isSuccess()) {
+            System.out.println("Errors found:");
+            for (String error : result.getErrors()) {
+                System.out.println("  - " + error);
+            }
+        }
+        
+        assertTrue("Three local variables should be allowed", result.isSuccess());
+    }
+
+    /**
+     * TEST 22: Global variable access in procedure (should pass)
+     */
+    @Test
+    public void testGlobalVariableAccessInProcedure() throws Exception {
+        String source = "glob { globalVar ; } proc { myproc ( ) { local { } globalVar = 5 ; } } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Global variable access in procedure should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 23: Complex nested if-else
+     */
+    @Test
+    public void testComplexNestedIfElse() throws Exception {
+        String source = "glob { x ; } proc { } func { } main { " +
+                "var { } " +
+                "if ( x > 0 ) { " +
+                "  if ( x > 10 ) { " +
+                "    print \"large\" " +
+                "  } else { " +
+                "    print \"medium\" " +
+                "  } " +
+                "} else { " +
+                "  print \"negative\" " +
+                "} ; " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Complex nested if-else should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 24: Multiple procedure calls
+     */
+    @Test
+    public void testMultipleProcedureCalls() throws Exception {
+        String source = "glob { } " +
+                "proc { " +
+                "  proc1 ( ) { local { } halt } " +
+                "  proc2 ( ) { local { } halt } " +
+                "} " +
+                "func { } " +
+                "main { " +
+                "  var { } " +
+                "  proc1 ( ) ; " +
+                "  proc2 ( ) ; " +
+                "  halt " +
+                "}";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Multiple procedure calls should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 25: Function call in expression
+     */
+@Test
+public void testFunctionCallInExpression() throws Exception {
+    String source = "glob { } " +
+            "proc { } " +
+            "func { " +
+            "  add ( a b ) { local { } ; return ( a plus b ) } " +
+            "} " +
+            "main { " +
+            "  var { result ; } " +
+            "  result = add ( 5 3 ) ; " +
+            "  halt " +
+            "}";
+    List<Token> tokens = new Lexer(source).tokenize();
+    
+    // DEBUG: Print tokens around the assignment
+    System.out.println("=== TOKENS AROUND ASSIGNMENT ===");
+    for (int i = 0; i < tokens.size(); i++) {
+        Token t = tokens.get(i);
+        if (t.getType() != TokenType.EOF && i >= 25 && i <= 35) { // Focus on assignment area
+            System.out.printf("%2d: %-15s '%s' at %d:%d%n", 
+                i, t.getType(), t.getLexeme(), t.getLine(), t.getColumn());
+        }
+    }
+    
+    ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+    ScopeAnalysisResult result = analyzer.analyze();
+    
+    // DEBUG: Print symbol table and errors
+    analyzer.debugSymbolTable();
+    if (!result.isSuccess()) {
+        System.out.println("Errors found:");
+        for (String error : result.getErrors()) {
+            System.out.println("  - " + error);
+        }
+    }
+    
+    assertTrue("Function call in expression should be valid", result.isSuccess());
+}
+
+    @Test
+    public void testSimpleFunctionDefinition() throws Exception {
+        String source = "glob { } " +
+                "proc { } " +
+                "func { " +
+                "  simple ( ) { local { } ; return 1 } " +  // Simple function
+                "} " +
+                "main { " +
+                "  var { } " +
+                "  halt " +
+                "}";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Simple function definition should work", result.isSuccess());
+    }
+
+    @Test
+    public void testFunctionCallWithNoParameters() throws Exception {
+        String source = "glob { } " +
+                "proc { } " +
+                "func { " +
+                "  getValue ( ) { local { } ; return 42 } " +
+                "} " +
+                "main { " +
+                "  var { result ; } " +
+                "  result = getValue ( ) ; " +
+                "  halt " +
+                "}";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+
+        assertTrue("Function call with no parameters should work", result.isSuccess());
+    }
+
+    /**
+     * TEST 26: Empty everything except main
+     */
+    @Test
+    public void testEmptyEverythingExceptMain() throws Exception {
+        String source = "glob { } proc { } func { } main { var { } halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Empty everything except main should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 27: Complex arithmetic expression
+     */
+    @Test
+    public void testComplexArithmeticExpression() throws Exception {
+        String source = "glob { a b c ; } proc { } func { } main { " +
+                "var { result ; } " +
+                "result = ( ( a plus b ) mult ( c minus 1 ) ) ; " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Complex arithmetic expression should be valid", result.isSuccess());
+    }
+
+
+    /**
+     * TEST 29: Unary operators
+     */
+    @Test
+    public void testUnaryOperators() throws Exception {
+        String source = "glob { x ; } proc { } func { } main { " +
+                "var { result ; } " +
+                "result = ( neg x ) ; " +
+                "if ( not ( x > 0 ) ) { " +
+                "  result = 0 " +
+                "} ; " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Unary operators should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 30: Mixed variable declarations (with and without 'var' keyword)
+     */
+    @Test
+    public void testMixedVariableDeclarations() throws Exception {
+        String source = "glob { var x ; y z ; } proc { } func { } main { " +
+                "var { var a ; b ; } " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Mixed variable declarations should be valid", result.isSuccess());
+    }
+
+
+    /**
+     * TEST 34: Do-until with multiple statements
+     */
+    @Test
+    public void testDoUntilWithMultipleStatements() throws Exception{
+        String source = "glob { x ; } proc { } func { } main { " +
+                "var { } " +
+                "do { " +
+                "  x = ( x plus 1 ) ; " +
+                "  print x ; " +
+                "  if ( x > 50 ) { " +
+                "    print \"over 50\" " +
+                "  } " +
+                "} until ( x > 100 ) ; " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Do-until with multiple statements should be valid", result.isSuccess());
+    }
+
+    /**
+     * TEST 35: Print with variables and strings
+     */
+    @Test
+    public void testPrintWithVariablesAndStrings() throws Exception {
+        String source = "glob { name age ; } proc { } func { } main { " +
+                "var { } " +
+                "print \"Name \" ; " +
+                "print name ; " +
+                "print \"Age \" ; " +
+                "print age ; " +
+                "halt }";
+        List<Token> tokens = new Lexer(source).tokenize();
+        ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
+        ScopeAnalysisResult result = analyzer.analyze();
+        
+        assertTrue("Print with variables and strings should be valid", result.isSuccess());
+    }
+
 }
