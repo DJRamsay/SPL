@@ -14,7 +14,6 @@ public class TypeAnalyzer {
     private final List<String> errors;
     private final Map<String, TypeInfo> symbolTable;
     
-    // Context tracking for procedures/functions
     private String currentContext = null;
     
     public TypeAnalyzer(List<Token> tokens) {

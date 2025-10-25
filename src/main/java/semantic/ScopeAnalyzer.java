@@ -215,78 +215,58 @@ public class ScopeAnalyzer {
     }
     
     // Check global naming conflicts
-    private void checkGlobalNamingConflicts() {
-        System.out.println("=== DEBUG checkGlobalNamingConflicts ===");
-        
+    private void checkGlobalNamingConflicts() {        
         Set<String> variableNames = new HashSet<>();
         Set<String> procedureNames = new HashSet<>();
         Set<String> functionNames = new HashSet<>();
         
         for (SymbolInfo symbol : symbolTable.values()) {
-            System.out.println("DEBUG: Symbol: " + symbol.name + " -> " + symbol.type + " in " + symbol.scope);
             if (symbol.scope == Scope.GLOBAL || symbol.scope == Scope.EVERYWHERE) {
                 switch (symbol.type) {
                     case VARIABLE:
                         variableNames.add(symbol.name);
-                        System.out.println("DEBUG: Global variable: " + symbol.name);
                         break;
                     case PROCEDURE:
                         procedureNames.add(symbol.name);
-                        System.out.println("DEBUG: Procedure: " + symbol.name);
                         break;
                     case FUNCTION:
                         functionNames.add(symbol.name);
-                        System.out.println("DEBUG: Function: " + symbol.name);
                         break;
                     case PARAMETER:
                         break;
                 }
             }
         }
-        
-        System.out.println("DEBUG: Global variables: " + variableNames);
-        System.out.println("DEBUG: Procedures: " + procedureNames);
-        System.out.println("DEBUG: Functions: " + functionNames);
-        
+                
         // Check conflicts
         for (String varName : variableNames) {
             if (procedureNames.contains(varName)) {
                 errors.add("Naming error: variable '" + varName + "' conflicts with procedure name");
-                System.out.println("DEBUG: Conflict detected: variable '" + varName + "' vs procedure");
             }
             if (functionNames.contains(varName)) {
                 errors.add("Naming error: variable '" + varName + "' conflicts with function name");
-                System.out.println("DEBUG: Conflict detected: variable '" + varName + "' vs function");
             }
         }
         
         for (String procName : procedureNames) {
             if (functionNames.contains(procName)) {
                 errors.add("Naming error: procedure '" + procName + "' conflicts with function name");
-                System.out.println("DEBUG: Conflict detected: procedure '" + procName + "' vs function");
             }
         }
-        
-        System.out.println("DEBUG: Total errors found: " + errors.size());
     }
     
     // VARIABLES ::= VAR VARIABLES | epsilon
     private void analyzeVARIABLES() throws ScopeException {
         Set<String> declaredNames = new HashSet<>();
-        
-        System.out.println("DEBUG analyzeVARIABLES: Starting at " + where());
-        System.out.println("DEBUG: Current scope: " + currentScope);
-        
+                
         //if we immediately see RBRACE, it's an empty variables block
         if (check(TokenType.RBRACE)) {
-            System.out.println("DEBUG: Empty variables block");
             return;
         }
         
         while (true) {
             // Check if we've reached the end of the variables block
             if (check(TokenType.RBRACE)) {
-                System.out.println("DEBUG: Reached end of variables block");
                 break;
             }
             
@@ -308,7 +288,6 @@ public class ScopeAnalyzer {
             }
             
             String varName = name.getLexeme();
-            System.out.println("DEBUG: Found variable: " + varName + " in scope: " + currentScope);
             
             // Check for double declaration in same scope
             if (declaredNames.contains(varName)) {
@@ -318,7 +297,6 @@ public class ScopeAnalyzer {
             
             // Add to symbol table
             SymbolInfo symbol = new SymbolInfo(varName, SymbolType.VARIABLE, currentScope, null);
-            System.out.println("DEBUG: Adding to symbol table: " + varName + " as " + symbol.type + " in " + symbol.scope);
 
             // Check for conflicts BEFORE adding to symbol table
             if (symbolTable.containsKey(varName)) {
@@ -340,7 +318,6 @@ public class ScopeAnalyzer {
                 advance();
             }
         }
-        System.out.println("DEBUG: Finished VARIABLES with " + declaredNames.size() + " variables");
     }
     
     // PROCDEFS ::= PDEF PROCDEFS | epsilon
@@ -428,11 +405,9 @@ public class ScopeAnalyzer {
     
     // FDEF ::= NAME { PARAM } { BODY ; return ATOM }
     private void analyzeFDEF() throws ScopeException {
-        System.out.println("DEBUG analyzeFDEF: Starting function definition");
         
         Token name = parseNAME();
         String funcName = name.getLexeme();
-        System.out.println("DEBUG: Defining function: " + funcName);
         
         // Add function to symbol table
         addToSymbolTable(new SymbolInfo(funcName, SymbolType.FUNCTION, Scope.EVERYWHERE, null));
@@ -480,67 +455,49 @@ public class ScopeAnalyzer {
         currentScope = Scope.FUNCTION;
         currentFunction = savedFunction;
         
-        System.out.println("DEBUG: Finished function definition: " + funcName);
     }
     
     // BODY ::= local { MAXTHREE } ALGO
     private void analyzeBODY() throws ScopeException {
-        System.out.println("DEBUG analyzeBODY: Starting at " + where());
         
         expect(TokenType.LOCAL, "Expected 'local'");
         expect(TokenType.LBRACE, "Expected '{' after local");
         
         // Analyze local variables
         Set<String> localVars = analyzeMAXTHREE();
-        System.out.println("DEBUG: Local vars found: " + localVars);
-        System.out.println("DEBUG: Current scope variables: " + currentScopeVariables);
         
         // Check for shadowing of parameter names by local variables
         for (String localVar : localVars) {
-            System.out.println("DEBUG: Checking local variable: " + localVar);
-            System.out.println("DEBUG: Is in currentScopeVariables? " + currentScopeVariables.contains(localVar));
             
             if (currentScopeVariables.contains(localVar)) {
-                System.out.println("DEBUG: ✓ SHADOWING DETECTED: " + localVar);
                 throw new ScopeException("Shadowing of parameter '" + localVar + "' by local variable declaration");
-            } else {
-                System.out.println("DEBUG: No shadowing for: " + localVar);
             }
             
             // Add local variable to symbol table
             String context = currentProcedure != null ? currentProcedure : currentFunction;
-            System.out.println("DEBUG: Adding local variable to symbol table: " + localVar + " in context: " + context);
             symbolTable.put(localVar, new SymbolInfo(localVar, SymbolType.VARIABLE, Scope.LOCAL, context));
         }
         
         // Handle optional semicolon after local variables
         if (check(TokenType.SEMICOLON)) {
-            System.out.println("DEBUG: Consuming semicolon after local variables");
             advance(); // consume the semicolon
         }
         
         expect(TokenType.RBRACE, "Expected '}' after local variables");
-        System.out.println("DEBUG: After local block, current token: " + peek().getType() + " '" + peek().getLexeme() + "'");
         
         analyzeALGO();
-        System.out.println("DEBUG: Finished BODY at " + where());
     }
     
     // PARAM ::= MAXTHREE
     private void analyzePARAM() throws ScopeException {
-        System.out.println("DEBUG analyzePARAM: Starting at " + where());
         
         Set<String> params = analyzeMAXTHREE();
-        System.out.println("DEBUG: Parameters found: " + params);
-        System.out.println("DEBUG: Adding to currentScopeVariables: " + params);
         
         currentScopeVariables.addAll(params);
-        System.out.println("DEBUG: currentScopeVariables now: " + currentScopeVariables);
         
         // Add parameters to symbol table
         for (String param : params) {
             String context = currentProcedure != null ? currentProcedure : currentFunction;
-            System.out.println("DEBUG: Adding parameter to symbol table: " + param + " in context: " + context);
             symbolTable.put(param, new SymbolInfo(param, SymbolType.PARAMETER, Scope.LOCAL, context));
         }
     }
@@ -549,12 +506,9 @@ public class ScopeAnalyzer {
     private Set<String> analyzeMAXTHREE() throws ScopeException {
         Set<String> names = new HashSet<>();
         int count = 0;
-        
-        System.out.println("DEBUG analyzeMAXTHREE: Starting at " + where());
-        
+                
         // Handle epsilon case - empty MAXTHREE block
         if (check(TokenType.RBRACE)) {
-            System.out.println("DEBUG: Empty MAXTHREE block");
             return names;
         }
         
@@ -568,7 +522,6 @@ public class ScopeAnalyzer {
             }
             
             String varName = name.getLexeme();
-            System.out.println("DEBUG: Found local variable: " + varName);
             
             // Check for double declaration in parameters
             if (names.contains(varName)) {
@@ -580,12 +533,10 @@ public class ScopeAnalyzer {
             // Check if we've reached the end of the MAXTHREE block
             // Don't consume semicolon or RBRACE - let the caller handle them
             if (check(TokenType.SEMICOLON) || check(TokenType.RBRACE)) {
-                System.out.println("DEBUG: Reached end of MAXTHREE at: " + peek().getType() + " '" + peek().getLexeme() + "'");
                 break;
             }
         }
         
-        System.out.println("DEBUG: MAXTHREE finished with " + names.size() + " variables: " + names);
         return names;
     }
     
@@ -600,47 +551,33 @@ public class ScopeAnalyzer {
     
     // ALGO ::= INSTR | INSTR ; ALGO  
     private void analyzeALGO() throws ScopeException {
-        System.out.println("DEBUG analyzeALGO: Starting at " + where());
-        System.out.println("DEBUG: Current token: " + peek().getType() + " '" + peek().getLexeme() + "'");
-        
         analyzeINSTR(); 
-        System.out.println("DEBUG: After first INSTR at: " + where());
-        System.out.println("DEBUG: Current token: " + peek().getType() + " '" + peek().getLexeme() + "'");
 
-        while (true) {
-            System.out.println("DEBUG: ALGO loop, current token: " + peek().getType() + " '" + peek().getLexeme() + "'");
-            
+        while (true) {            
             if (check(TokenType.RBRACE) || check(TokenType.RETURN) || check(TokenType.EOF)) {
-                System.out.println("DEBUG: Stopping ALGO at stopping point");
                 break;
             }
             
             if (check(TokenType.SEMICOLON)) {
-                System.out.println("DEBUG: Found semicolon, consuming it");
                 advance(); // consume the semicolon
                 
                 if (check(TokenType.RBRACE) || check(TokenType.RETURN) || check(TokenType.EOF)) {
-                    System.out.println("DEBUG: Stopping after semicolon");
                     break;
                 }
                 
-                System.out.println("DEBUG: Parsing next INSTR after semicolon");
                 analyzeINSTR();
             } else {
                 TokenType currentType = peek().getType();
-                System.out.println("DEBUG: No semicolon, current type: " + currentType);
                 
                 if (currentType == TokenType.HALT || currentType == TokenType.PRINT || 
                     currentType == TokenType.WHILE || currentType == TokenType.DO || 
                     currentType == TokenType.IF || currentType == TokenType.IDENTIFIER) {
                     throw new ScopeException("Expected ';' between instructions at " + where());
                 } else {
-                    System.out.println("DEBUG: Not an instruction start, ending ALGO");
                     break;
                 }
             }
         }
-        System.out.println("DEBUG: Finished ALGO at: " + where());
     }
     
     // INSTR ::= halt | print OUTPUT | NAME ( INPUT ) | ASSIGN | LOOP | BRANCH
@@ -885,39 +822,30 @@ public class ScopeAnalyzer {
     }
 
     public void debugSymbolTable() {
-        System.out.println("=== DEBUG SYMBOL TABLE ===");
         for (SymbolInfo symbol : symbolTable.values()) {
             System.out.println("  " + symbol.name + " -> " + symbol.type + " in " + symbol.scope + 
                             (symbol.context != null ? " (context: " + symbol.context + ")" : ""));
         }
-        System.out.println("=== END DEBUG ===");
     }
 
     private void addToSymbolTable(SymbolInfo newSymbol) throws ScopeException {
         String name = newSymbol.name;
         
-        System.out.println("=== DEBUG addToSymbolTable ===");
-        System.out.println("DEBUG: Trying to add: " + newSymbol);
         
         if (symbolTable.containsKey(name)) {
             SymbolInfo existing = symbolTable.get(name);
-            System.out.println("DEBUG: Conflict with existing: " + existing);
             
             // Check for global naming conflicts
             boolean existingIsGlobal = existing.scope == Scope.EVERYWHERE || existing.scope == Scope.GLOBAL;
             boolean newIsGlobal = newSymbol.scope == Scope.EVERYWHERE || newSymbol.scope == Scope.GLOBAL;
-            
-            System.out.println("DEBUG: existingIsGlobal=" + existingIsGlobal + ", newIsGlobal=" + newIsGlobal);
-            
+                        
             if (existingIsGlobal && newIsGlobal) {
                 // Global naming rules: no variable/function/procedure name conflicts
                 boolean isConflict = (existing.type == SymbolType.VARIABLE && (newSymbol.type == SymbolType.PROCEDURE || newSymbol.type == SymbolType.FUNCTION)) ||
                                     (newSymbol.type == SymbolType.VARIABLE && (existing.type == SymbolType.PROCEDURE || existing.type == SymbolType.FUNCTION)) ||
                                     ((existing.type == SymbolType.PROCEDURE || existing.type == SymbolType.FUNCTION) && 
                                     (newSymbol.type == SymbolType.PROCEDURE || newSymbol.type == SymbolType.FUNCTION));
-                
-                System.out.println("DEBUG: Global conflict check: " + isConflict);
-                
+                                
                 if (isConflict) {
                     throw new ScopeException("Naming conflict: '" + name + "' is both a " + existing.type + " and a " + newSymbol.type);
                 }
@@ -925,19 +853,14 @@ public class ScopeAnalyzer {
             
             // Check for same scope conflicts
             boolean sameScopeConflict = isSameScopeConflict(existing, newSymbol);
-            System.out.println("DEBUG: Same scope conflict: " + sameScopeConflict);
             
             if (sameScopeConflict) {
                 throw new ScopeException("Duplicate symbol '" + name + "' in " + newSymbol.scope + " scope");
             }
             
-            System.out.println("DEBUG: No conflict detected, allowing overwrite/replacement");
-        } else {
-            System.out.println("DEBUG: No existing symbol with name '" + name + "'");
         }
         
         symbolTable.put(name, newSymbol);
-        System.out.println("DEBUG: Successfully added: " + newSymbol);
     }
 }
 
