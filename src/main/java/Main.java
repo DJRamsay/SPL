@@ -16,7 +16,7 @@ public class Main {
 
         try {
             if (args.length < 1){
-                String defaultInput = "src/main/java/input.txt";
+                String defaultInput = "src/main/java/input2.txt";
                 System.out.println("No arguments provided. Reading from " + defaultInput);
                 source = readFile(defaultInput);
             } else {
@@ -83,6 +83,26 @@ public class Main {
                 }
             } catch (Exception e) {
                 System.err.println("Scope analysis error: " + e.getMessage());
+                System.exit(1);
+            }
+
+            // === Type Analysis ===
+            System.out.println("====Type Analysis====");
+            try {
+                semantic.TypeAnalyzer typeAnalyzer = new semantic.TypeAnalyzer(tokens);
+                semantic.TypeAnalyzer.TypeAnalysisResult typeResult = typeAnalyzer.analyze();
+                
+                if (typeResult.isSuccess()) {
+                    System.out.println("Variable Naming and Function Naming accepted");
+                } else {
+                    System.err.println("Naming errors found:");
+                    for (String error : typeResult.getErrors()) {
+                        System.err.println("  - " + error);
+                    }
+                    System.exit(1);
+                }
+            } catch (Exception e) {
+                System.err.println("Type analysis error: " + e.getMessage());
                 System.exit(1);
             }
 
