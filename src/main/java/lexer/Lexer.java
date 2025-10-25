@@ -87,13 +87,12 @@ public class Lexer {
     
     private Token scanIdentifierOrKeyword() throws LexerException {
         // [a...z]{a...z}*{0...9}*
-        // Check against keywords
         int startLine = line;
         int startColumn = column;
         StringBuilder lexeme = new StringBuilder();
         
         // First character must be a lowercase
-        if (!isLetter(peek())) {
+        if (!isLowercaseLetter(peek())) {
             throw new LexerException(
                 String.format("Invalid identifier at line %d, column %d: expected letter", 
                     line, column)
@@ -257,6 +256,10 @@ public class Lexer {
     
     private boolean isLetter(char c) {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+    }
+
+    private boolean isLowercaseLetter(char c) {
+        return (c >= 'a' && c <= 'z');
     }
     
     private boolean isDigit(char c) {
