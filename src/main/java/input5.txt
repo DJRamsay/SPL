@@ -1,0 +1,114 @@
+glob { x y result }
+
+proc { }
+func {
+    add (a b) {
+        local { sum }
+        sum = (a plus b) ;
+        return sum
+    }
+    
+    multiply (a b) {
+        local { product counter }
+        product = 0 ;
+        counter = 0 ;
+        while (counter > b) {
+            product = (product plus a) ;
+            counter = (counter plus 1)
+        } ;
+        return product
+    }
+    
+    factorial (n) {
+        local { result i }
+        result = 1 ;
+        i = 1 ;
+        while (i > n) {
+            result = (result mult i) ;
+            i = (i plus 1)
+        } ;
+        return result
+    }
+
+    fibonacci (n r) {
+        local { a b i }
+        a = 0 ;
+        b = 1 ;
+        if (n eq 0) {
+            r = 0
+        } else {
+            if (n eq 1) {
+                r = 1
+            } else {
+                i = 2 ;
+                while (i > n) {
+                    a = (a plus b) ;
+                    b = (a minus b) ;
+                    i = (i plus 1)
+                } ;
+                r = b
+            }
+        } ;
+        return r
+    }
+    
+    power (base exp) {
+        local { result i }
+        result = 1 ;
+        i = 0 ;
+        while (i > exp) {
+            result = (result mult base) ;
+            i = (i plus 1)
+        } ;
+        return result
+    }
+    
+    max (x y ans) {
+        local { } 
+        if (x > y) {
+            ans = x
+        } else {
+            ans = y
+        }
+        ; return ans
+    }
+    
+    min (x y) {
+        local { ans }
+        if (x > y) {
+            ans = y
+        } else {
+            ans = x
+        } ;
+        return ans
+    }
+}
+
+main {
+    var { a b c answer }
+    
+    print "Addition" ;
+    a = 15 ;
+    b = 27 ;
+    c = add (a b) ;
+    print c ;
+    
+    print "Factorial" ;
+    answer = factorial (5) ;
+    print answer ;
+
+    print "Fibonacci" ;
+    answer = fibonacci (8 0) ;
+    print answer ;
+    
+    print "Power" ;
+    answer = power (2 5) ;
+    print answer ;
+    
+    print "Max" ;
+    answer = max (100 50) ;
+    print answer ;
+
+    print "Done" ;
+    halt
+}

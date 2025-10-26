@@ -1,0 +1,86 @@
+glob { x y z result }
+
+proc{
+
+}
+
+func {
+    add (a b) {
+        local { sum }
+        sum = (a plus b) ;
+        return sum
+    }
+    
+    multiply (a b) {
+        local { product counter }
+        product = 0 ;
+        counter = 0 ;
+        while (counter > b) {
+            product = (product plus a) ;
+            counter = (counter plus 1)
+        } ;
+        return product
+    }
+    
+    factorial (n) {
+        local { result i }
+        result = 1 ;
+        i = 1 ;
+        while (i > n) {
+            result = (result mult i) ;
+            i = (i plus 1)
+        } ;
+        return result
+    }
+
+    iseven (num) {
+        local { ans half doubled }
+        half = (num div 2) ;
+        doubled = (half mult 2) ;
+        if (doubled eq num) {
+            ans = 1 
+        } else {
+            ans = 0 
+        } ;
+        return ans
+    }
+}
+
+main {
+    var { a b c d answer check }
+    
+    print "Testing Add" ;
+    a = 15 ;
+    b = 27 ;
+    c = add (a b) ;
+    print "15 p 27 e " ;
+    print c ;
+    
+    print "Testing Mult" ;
+    d = multiply ( 6 7 ) ;
+    print "6 m 7 e " ;
+    print d ;
+    
+    print "Testing Fac" ;
+    answer = factorial ( 5 ) ;
+    print "5f e " ;
+    print answer ;
+    
+    print "Testing EvOd" ;
+    check = iseven ( 42 ) ;
+    if (check eq 1) {
+        print "42 is even"
+    } else {
+        print "42 is odd"
+    } ;
+    
+    check = iseven ( 17 ) ;
+    if (check eq 1) {
+        print "17 is even"
+    } else {
+        print "17 is odd"
+    } ;
+    
+    print "Tests fin" ;
+    halt
+}

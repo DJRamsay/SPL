@@ -22,7 +22,7 @@ public class Main {
         try {
             // === Read Input ===
             if (args.length < 1) {
-                String defaultInput = "src/main/java/input4.txt";
+                String defaultInput = "src/main/java/input.txt";
                 System.out.println("No arguments provided. Reading from " + defaultInput);
                 source = readFile(defaultInput);
             } else {
@@ -93,9 +93,9 @@ public class Main {
                 System.out.println("- Code generation complete");
                 
                 // Print the intermediate code
-                System.out.println("\n---- Intermediate Code ----");
-                System.out.println(targetCode);
-                System.out.println("---------------------------");
+                // System.out.println("\n---- Intermediate Code ----");
+                // System.out.println(targetCode);
+                // System.out.println("---------------------------");
                 
             } catch (Exception e) {
                 System.err.println("Code generation error: " + e.getMessage());
@@ -124,7 +124,7 @@ public class Main {
                 System.out.println(finalExecutableCode);
                 System.out.println("----------------------");
                 System.out.println("\nOutput saved to: " + INTERMEDIATE_CODE_PATH);
-                System.out.println("\nRun your code online at: https://www.quitebasic.com/");
+                System.out.println("\nRun code online at: https://www.quitebasic.com/");
             } catch (Exception e) {
                 System.err.println("Post-processing error: " + e.getMessage());
                 e.printStackTrace();
