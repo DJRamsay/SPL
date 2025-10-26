@@ -56,3 +56,6 @@ Student Programming Language for COS341
 ├── README.md
 └── .gitignore
 ```
+
+## To run: ##
+```.\run.ps1```
