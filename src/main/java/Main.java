@@ -1,7 +1,10 @@
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
-
+import basic.BasicPostProcessor; 
 import codegen.CodeGenerator;
 import lexer.Lexer;
 import lexer.LexerException;
@@ -10,6 +13,8 @@ import parser.Parser;
 import parser.ParserException;
 
 public class Main {
+
+    private static final String INTERMEDIATE_CODE_PATH = "target/target_code.txt";
 
     public static void main(String args[]) throws IOException {
         String source;
@@ -36,13 +41,6 @@ public class Main {
             for (int i = 0; i < lines.length; i++) {
                 System.out.printf("%3d: %s%n", i + 1, lines[i]);
             }
-
-            // // Debug: print tokens
-            // System.out.println("---- Tokens ----");
-            // for (Token t : tokens) {
-            //     System.out.println(t);
-            // }
-            // System.out.println("---- End Tokens ----");
             
             // === 2. Syntax Analysis (Parsing) ===
             System.out.println("\n====Syntax Analysis (Parsing)====");
@@ -97,26 +95,59 @@ public class Main {
                 System.exit(1);
             }
 
-            // === 5. Code Generation (ONLY if all checks passed) ===
-            System.out.println("\n====Code Generation====");
+            // === 5. Code Generation (UN-NUMBERED INTERMEDIATE CODE) ===
+            System.out.println("\n====Code Generation (Un-numbered)====");
+            String targetCode;
             try {
                 CodeGenerator gen = new CodeGenerator(tokens);
-                String targetCode = gen.generate();
+                targetCode = gen.generate();
                 
                 System.out.println("---- Target Code ----");
                 System.out.println(targetCode);
                 System.out.println("---- End Target Code ----");
 
                 // Save target code to file
-                String outPath = "target/target_code.txt";
-                writeFile(outPath, targetCode);
-                System.out.println("\nTarget code saved to: " + outPath);
+                writeFile(INTERMEDIATE_CODE_PATH, targetCode);
+                System.out.println("\nUn-numbered intermediate code saved to: " + INTERMEDIATE_CODE_PATH);
                 
             } catch (Exception e) {
                 System.err.println("Code generation error: " + e.getMessage());
                 e.printStackTrace();
                 System.exit(1);
             }
+            
+            // ----------------------------------------------------------------------
+            // === 6. POST-PROCESSING STEP (Reads File -> Transforms -> Writes File) ===
+            // ----------------------------------------------------------------------
+            
+            System.out.println("\n====Post-Processing (Line Numbering & Jumps)====");
+            
+            try {
+                // A. READ: Read the un-numbered code back from the file, splitting it into lines
+                List<String> intermediateCodeLines = Files.readAllLines(
+                    Paths.get(INTERMEDIATE_CODE_PATH), 
+                    StandardCharsets.US_ASCII
+                );
+                
+                // B. PROCESS: Use BasicPostProcessor to perform the transformation
+                BasicPostProcessor postProcessor = new BasicPostProcessor();
+                List<String> finalBasicCodeLines = postProcessor.generateExecutableBasic(intermediateCodeLines);
+                
+                // Convert the list of final BASIC lines back into a single string
+                String finalExecutableCode = String.join(System.lineSeparator(), finalBasicCodeLines);
+
+                // C. WRITE: Overwrite the file with the final, executable BASIC code
+                writeFile(INTERMEDIATE_CODE_PATH, finalExecutableCode);
+                
+                System.out.println("---- Final Executable BASIC Code ----");
+                System.out.println(finalExecutableCode);
+                System.out.println("Final executable code saved to: " + INTERMEDIATE_CODE_PATH);
+            } catch (Exception e) {
+                System.err.println("Post-processing error: " + e.getMessage());
+                e.printStackTrace();
+                System.exit(1);
+            }
+
 
             // === Compilation Successful ===
             System.out.println("\n========================================");
@@ -133,17 +164,17 @@ public class Main {
     }
 
     private static String readFile(String path) throws IOException {
-        return new String(java.nio.file.Files.readAllBytes(
-            java.nio.file.Paths.get(path)));
+        return new String(Files.readAllBytes(
+            Paths.get(path)));
     }
     
     private static void writeFile(String path, String content) throws IOException {
         var p = java.nio.file.Paths.get(path);
         var parent = p.getParent();
         if (parent != null) {
-            java.nio.file.Files.createDirectories(parent);
+            Files.createDirectories(parent);
         }
-        java.nio.file.Files.write(
+        Files.write(
             p,
             content.getBytes(StandardCharsets.US_ASCII));
     }

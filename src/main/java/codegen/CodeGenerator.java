@@ -194,11 +194,11 @@ public class CodeGenerator {
             if (check(TokenType.IDENTIFIER) && lookAheadLex("(")) {
                 String fname = advance().getLexeme();
                 List<String> args = parseInputList();
-                emit(lhs + " = CALL " + fname + joinArgs(args));
+                emit("LET " + lhs + " = CALL " + fname + joinArgs(args));
                 return;
             }
             Expr rhs = parseTermExpr();
-            emit(lhs + " = " + exprToString(rhs));
+            emit("LET " + lhs + " = " + exprToString(rhs));
             return;
         }
 
