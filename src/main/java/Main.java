@@ -14,7 +14,7 @@ import parser.ParserException;
 
 public class Main {
 
-    private static final String INTERMEDIATE_CODE_PATH = "target/target_code.txt";
+    private static final String INTERMEDIATE_CODE_PATH = "/target_code.txt";
 
     public static void main(String args[]) throws IOException {
         String source;
