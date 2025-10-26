@@ -1,8 +1,8 @@
-glob { var num ; }
+glob { num }
 proc { }
 func { }
 main {
-  var { var i ; }
+  var { i }
   i = 1 ;
   while (i > 10) {
     if ((i div 2) eq 0) {

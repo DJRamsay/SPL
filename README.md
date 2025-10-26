@@ -58,4 +58,5 @@ Student Programming Language for COS341
 ```
 
 ## To run: ##
-```.\run.ps1```
+- Project can be compliled and run using: ```.\run.ps1```
+- Test can be run with ```mvn clean test```
