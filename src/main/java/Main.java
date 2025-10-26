@@ -33,8 +33,6 @@ public class Main {
             System.out.println("====Lexical Analysis====");
             Lexer lexer = new Lexer(source);
             List<Token> tokens = lexer.tokenize();
-            Lexer lexer = new Lexer(source);
-            List<Token> tokens = lexer.tokenize();
             System.out.println("Tokens generated: " + tokens.size());
 
             // Debug: print source with line numbers
