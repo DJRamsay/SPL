@@ -1,20 +1,17 @@
-glob { num }
+glob { a b result } 
 proc { }
-func { }
-main {
-  var { i }
-  i = 1 ;
-  while (i > 10) {
-    if ((i div 2) eq 0) {
-      print "even"
-    } else {
-      if (i > 5) {
-        print "odd and big"
-      } else {
-        print "odd and small"
-      }
-    } ;
-    i = (i plus 1)
-  } ;
-  halt
+func { 
+    add (x y) { 
+    local { sum }
+    sum = (x plus y)
+    ; return sum 
+    } 
+} 
+main { 
+    var { }
+    a = 5 ;
+    b = 3 ;
+    result = add (a b) ;
+    print result ; 
+    halt 
 }

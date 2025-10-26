@@ -7,6 +7,7 @@
 /build/
 /target/
 /out/
+target_code.txt
 
 # IDE files
 .idea/
