@@ -1,96 +1,346 @@
 package basic;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+/**
+ * Transforms intermediate code into executable BASIC.
+ * 
+ * Handles:
+ * 1. Function/procedure definitions -> GOSUB subroutines
+ * 2. CALL statements -> parameter passing + GOSUB + return value
+ * 3. RETURN value -> LET Z = value; RETURN
+ * 4. Line numbering
+ * 5. Label resolution (GOTO/THEN)
+ */
 public class BasicPostProcessor {
     private static final int LINE_INCREMENT = 10;
+    private static final int FUNCTION_START = 1000;  // Functions start at line 1000
+    private static final int MAIN_START = 500;        // Main program starts at line 500
+    private static final String RETURN_VAR = "Z";     // Use Z for return values (RESULT is reserved)
     
-    // Assuming LabelMap is correct and throws CodeGenerationException on missing label.
-
     /**
-     * Performs line numbering and extracts label definitions into a LabelMap.
+     * Main entry point - transforms intermediate code to executable BASIC.
      */
-    private List<String> pass1_NumberLinesAndMapLabels(
-            List<String> intermediateCode, 
-            LabelMap labelMap) {
+    public List<String> generateExecutableBasic(List<String> intermediateCode) {
+        // Step 1: Parse and separate functions/procedures from main code
+        CodeStructure structure = parseStructure(intermediateCode);
         
-        List<String> numberedCode = new ArrayList<>();
-        int currentLineNumber = LINE_INCREMENT; // Start at 10
-
-        for (String instruction : intermediateCode) {
+        // Step 2: Transform functions/procedures
+        List<String> transformedFunctions = transformFunctions(structure);
+        
+        // Step 3: Transform main code
+        List<String> transformedMain = transformMain(structure);
+        
+        // Step 4: Combine: skip to main, then functions, then main
+        List<String> combined = new ArrayList<>();
+        combined.add("GOTO MAIN");  // Will be resolved to line number later
+        combined.addAll(transformedFunctions);
+        combined.add("REM MAIN");
+        combined.addAll(transformedMain);
+        
+        // Step 5: Number lines and map labels
+        LabelMap labelMap = new LabelMap();
+        List<String> numberedCode = numberLinesAndMapLabels(combined, labelMap);
+        
+        // Step 6: Resolve all jumps (GOTO/THEN)
+        return resolveJumps(numberedCode, labelMap);
+    }
+    
+    /**
+     * Parse intermediate code into functions/procedures and main code.
+     */
+    private CodeStructure parseStructure(List<String> intermediateCode) {
+        CodeStructure structure = new CodeStructure();
+        FunctionDef currentFunction = null;
+        boolean inFunction = false;
+        
+        for (String line : intermediateCode) {
+            String trimmed = line.trim();
             
-            // FIX 1: Change condition to check for any REM instruction
-            if (instruction.trim().startsWith("REM ")) {
-                // Extract the label name (e.g., "START" from "REM START")
-                // Use substring and trim to reliably get the label
-                String label = instruction.trim().substring("REM ".length()).trim();
+            // Check for function/procedure definition
+            if (trimmed.startsWith("REM FUNC ") || trimmed.startsWith("REM PROC ")) {
+                // Extract function name and parameters
+                boolean isFunc = trimmed.startsWith("REM FUNC ");
+                String rest = trimmed.substring(isFunc ? 9 : 9).trim();
+                
+                // Parse "funcname (param1, param2)" or "funcname ()"
+                String funcName;
+                List<String> params = new ArrayList<>();
+                
+                int parenIdx = rest.indexOf('(');
+                if (parenIdx > 0) {
+                    funcName = rest.substring(0, parenIdx).trim();
+                    int closeIdx = rest.indexOf(')');
+                    if (closeIdx > parenIdx) {
+                        String paramStr = rest.substring(parenIdx + 1, closeIdx).trim();
+                        if (!paramStr.isEmpty()) {
+                            for (String p : paramStr.split(",")) {
+                                params.add(p.trim());
+                            }
+                        }
+                    }
+                } else {
+                    funcName = rest;
+                }
+                
+                currentFunction = new FunctionDef(funcName, params, isFunc);
+                structure.functions.add(currentFunction);
+                inFunction = true;
+                continue;
+            }
+            
+            // Check for RETURN (marks end of function)
+            if (trimmed.startsWith("RETURN")) {
+                if (inFunction && currentFunction != null) {
+                    currentFunction.body.add(trimmed);
+                    inFunction = false;
+                    currentFunction = null;
+                } else {
+                    structure.mainCode.add(trimmed);
+                }
+                continue;
+            }
+            
+            // Add to current function or main
+            if (inFunction && currentFunction != null) {
+                currentFunction.body.add(trimmed);
+            } else {
+                structure.mainCode.add(trimmed);
+            }
+        }
+        
+        return structure;
+    }
+    
+    /**
+     * Transform function definitions into BASIC subroutines.
+     */
+    private List<String> transformFunctions(CodeStructure structure) {
+        List<String> result = new ArrayList<>();
+        
+        for (FunctionDef func : structure.functions) {
+            // Add function label
+            result.add("REM " + func.name);
+            
+            // Transform the function body
+            for (String line : func.body) {
+                if (line.startsWith("RETURN ")) {
+                    // Transform "RETURN value" to "LET Z = value" then "RETURN"
+                    String returnValue = line.substring(7).trim();
+                    result.add("LET " + RETURN_VAR + " = " + returnValue);
+                    result.add("RETURN");
+                } else if (line.equals("RETURN")) {
+                    // Procedure with no return value
+                    result.add("RETURN");
+                } else {
+                    result.add(line);
+                }
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Transform main code, handling CALL statements.
+     */
+    private List<String> transformMain(CodeStructure structure) {
+        List<String> result = new ArrayList<>();
+        
+        // Pattern to match: LET var = CALL funcname arg1 arg2 ...
+        Pattern assignCallPattern = Pattern.compile("LET\\s+(\\w+)\\s*=\\s*CALL\\s+(\\w+)\\s*(.*)");
+        // Pattern to match: CALL funcname arg1 arg2 ...
+        Pattern callPattern = Pattern.compile("CALL\\s+(\\w+)\\s*(.*)");
+        
+        for (String line : structure.mainCode) {
+            Matcher assignMatcher = assignCallPattern.matcher(line);
+            Matcher callMatcher = callPattern.matcher(line);
+            
+            if (assignMatcher.matches()) {
+                // LET result = CALL funcname args
+                String resultVar = assignMatcher.group(1);
+                String funcName = assignMatcher.group(2);
+                String argsStr = assignMatcher.group(3).trim();
+                
+                // Find the function definition to get parameter names
+                FunctionDef func = structure.findFunction(funcName);
+                if (func != null) {
+                    // Parse arguments
+                    List<String> args = parseArguments(argsStr);
+                    
+                    // Assign arguments to parameters
+                    for (int i = 0; i < Math.min(args.size(), func.parameters.size()); i++) {
+                        result.add("LET " + func.parameters.get(i) + " = " + args.get(i));
+                    }
+                    
+                    // Call the function
+                    result.add("GOSUB " + funcName);
+                    
+                    // Get return value
+                    result.add("LET " + resultVar + " = " + RETURN_VAR);
+                } else {
+                    // Unknown function, keep as-is (will likely error later)
+                    result.add(line);
+                }
+            } else if (callMatcher.matches()) {
+                // CALL procname args (procedure call without assignment)
+                String procName = callMatcher.group(1);
+                String argsStr = callMatcher.group(2).trim();
+                
+                FunctionDef proc = structure.findFunction(procName);
+                if (proc != null) {
+                    List<String> args = parseArguments(argsStr);
+                    
+                    // Assign arguments to parameters
+                    for (int i = 0; i < Math.min(args.size(), proc.parameters.size()); i++) {
+                        result.add("LET " + proc.parameters.get(i) + " = " + args.get(i));
+                    }
+                    
+                    // Call the procedure
+                    result.add("GOSUB " + procName);
+                } else {
+                    result.add(line);
+                }
+            } else {
+                // Regular line, keep as-is
+                result.add(line);
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Parse space-separated arguments.
+     */
+    private List<String> parseArguments(String argsStr) {
+        List<String> args = new ArrayList<>();
+        if (argsStr.isEmpty()) {
+            return args;
+        }
+        
+        // Split by spaces, but handle parentheses
+        String[] parts = argsStr.split("\\s+");
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                args.add(part);
+            }
+        }
+        return args;
+    }
+    
+    /**
+     * Number lines and create label map.
+     */
+    private List<String> numberLinesAndMapLabels(List<String> code, LabelMap labelMap) {
+        List<String> numberedCode = new ArrayList<>();
+        int currentLineNumber = LINE_INCREMENT;
+        
+        for (String instruction : code) {
+            String trimmed = instruction.trim();
+            
+            // Map labels (REM statements)
+            if (trimmed.startsWith("REM ")) {
+                String label = trimmed.substring(4).trim();
                 if (!label.isEmpty()) {
                     labelMap.put(label, currentLineNumber);
                 }
             }
             
-            // 2. Add the line number and instruction to the new list
+            // Add numbered line
             numberedCode.add(currentLineNumber + " " + instruction);
-            
-            // 3. Increment the line number
             currentLineNumber += LINE_INCREMENT;
         }
+        
         return numberedCode;
     }
-
+    
     /**
-     * Resolves all symbolic jumps (GOTO Lx, THEN Lx) using the LabelMap.
+     * Resolve all GOTO and THEN references to line numbers.
      */
-    private List<String> pass2_ResolveJumps(
-            List<String> numberedCode, 
-            LabelMap labelMap) {
-        
+    private List<String> resolveJumps(List<String> numberedCode, LabelMap labelMap) {
         List<String> finalCode = new ArrayList<>();
         
         for (String line : numberedCode) {
             String resolvedLine = line;
-            String instructionPart = line.substring(line.indexOf(' ') + 1); // e.g., "GOTO START" or "IF (i>0) THEN L1"
             
-            // Check for GOTO [label]
+            // Extract the instruction part (after line number)
+            int spaceIdx = line.indexOf(' ');
+            if (spaceIdx < 0) {
+                finalCode.add(line);
+                continue;
+            }
+            
+            String instructionPart = line.substring(spaceIdx + 1);
+            
+            // Handle GOTO label
             if (instructionPart.startsWith("GOTO ")) {
-                // Extract the label (e.g., "START" from "GOTO START")
-                String label = instructionPart.substring("GOTO ".length()).trim();
-                int targetLine = labelMap.get(label); // throws exception if missing
-                
-                // FIX 2: Reconstruct the entire instruction line with the number
-                resolvedLine = line.replace("GOTO " + label, "GOTO " + targetLine);
-            } 
+                String label = instructionPart.substring(5).trim();
+                if (labelMap.containsLabel(label)) {
+                    int targetLine = labelMap.get(label);
+                    resolvedLine = line.replace("GOTO " + label, "GOTO " + targetLine);
+                }
+            }
             
-            // Check for THEN [label] (part of an IF statement)
+            // Handle GOSUB label
+            else if (instructionPart.startsWith("GOSUB ")) {
+                String label = instructionPart.substring(6).trim();
+                if (labelMap.containsLabel(label)) {
+                    int targetLine = labelMap.get(label);
+                    resolvedLine = line.replace("GOSUB " + label, "GOSUB " + targetLine);
+                }
+            }
+            
+            // Handle IF ... THEN label
             else if (instructionPart.contains("THEN ")) {
-                // We must find the label *after* the "THEN " keyword.
-                int thenIndex = instructionPart.lastIndexOf("THEN ");
-                String afterThen = instructionPart.substring(thenIndex + "THEN ".length()).trim();
-                
-                // The label is the first word after THEN (e.g., "L1" in "L1")
+                int thenIdx = instructionPart.lastIndexOf("THEN ");
+                String afterThen = instructionPart.substring(thenIdx + 5).trim();
                 String label = afterThen.split("\\s+")[0];
-                int targetLine = labelMap.get(label); // throws exception if missing
                 
-                // FIX 3: Reconstruct the line correctly:
-                resolvedLine = line.replace("THEN " + label, "THEN " + targetLine);
+                if (labelMap.containsLabel(label)) {
+                    int targetLine = labelMap.get(label);
+                    resolvedLine = line.replace("THEN " + label, "THEN " + targetLine);
+                }
             }
             
             finalCode.add(resolvedLine);
         }
+        
         return finalCode;
     }
-
-    /**
-     * Public method to run the entire post-processing chain.
-     */
-    public List<String> generateExecutableBasic(List<String> intermediateCode) {
-        LabelMap labelMap = new LabelMap();
+    
+    // ===== Helper Classes =====
+    
+    private static class CodeStructure {
+        List<FunctionDef> functions = new ArrayList<>();
+        List<String> mainCode = new ArrayList<>();
         
-        // Pass 1: Number lines and create the map
-        List<String> numberedCode = pass1_NumberLinesAndMapLabels(intermediateCode, labelMap);
+        FunctionDef findFunction(String name) {
+            for (FunctionDef func : functions) {
+                if (func.name.equals(name)) {
+                    return func;
+                }
+            }
+            return null;
+        }
+    }
+    
+    private static class FunctionDef {
+        String name;
+        List<String> parameters;
+        List<String> body;
+        boolean isFunction;  // true = function (returns value), false = procedure
         
-        // Pass 2: Resolve jumps using the created map
-        return pass2_ResolveJumps(numberedCode, labelMap);
+        FunctionDef(String name, List<String> parameters, boolean isFunction) {
+            this.name = name;
+            this.parameters = parameters;
+            this.body = new ArrayList<>();
+            this.isFunction = isFunction;
+        }
     }
 }

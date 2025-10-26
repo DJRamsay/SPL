@@ -9,7 +9,7 @@ import lexer.TokenType;
 
 /**
  * SPL -> Target code generator that works directly with Token types.
- * Properly uses TokenType enum instead of string comparisons.
+ * Maps SPL variable names to valid BASIC variable names (single letters).
  */
 public class CodeGenerator {
 
@@ -17,6 +17,7 @@ public class CodeGenerator {
     private int current = 0;
     private final StringBuilder out = new StringBuilder();
     private final LabelGenerator labels = new LabelGenerator();
+    private final VariableMapper varMapper = new VariableMapper();
 
     public CodeGenerator(List<Token> tokens) {
         this.tokens = tokens;
@@ -26,7 +27,7 @@ public class CodeGenerator {
         // program ::= [glob block] [proc block] [func block] main block
         while (!isAtEnd()) {
             if (match(TokenType.GLOB)) {
-                skipBraceBlock(); // ignore globals
+                skipBraceBlock(); // ignore globals but register variable names
                 continue;
             }
             if (match(TokenType.PROC)) {
@@ -41,7 +42,6 @@ public class CodeGenerator {
                 generateMain();
                 break;
             }
-            // Anything else: advance to avoid infinite loop
             advance();
         }
         return out.toString();
@@ -49,30 +49,30 @@ public class CodeGenerator {
 
     /**
      * Generate code for procedure definitions.
-     * PROCDEFS ::= PDEF PROCDEFS | ε
-     * PDEF ::= NAME ( PARAM ) { BODY }
      */
     private void generateProcDefs() {
         expect(TokenType.LBRACE, "Expected '{' to start proc block");
         
         while (!isAtEnd() && !check(TokenType.RBRACE)) {
-            // Each procedure definition
             if (check(TokenType.IDENTIFIER)) {
                 String procName = advance().getLexeme();
                 
-                // Parse parameters
+                // Parse parameters and map them
                 List<String> params = parseParamList();
+                List<String> mappedParams = new ArrayList<>();
+                for (String param : params) {
+                    mappedParams.add(varMapper.get(param));
+                }
                 
                 // Generate procedure header
-                emit("REM PROC " + procName + joinParams(params));
+                emit("REM PROC " + procName + joinParams(mappedParams));
                 
-                // Process BODY: local { MAXTHREE } ALGO
                 expect(TokenType.LBRACE, "Expected '{' to start procedure body");
                 
                 // Optional local variables
                 if (match(TokenType.LOCAL)) {
                     expect(TokenType.LBRACE, "Expected '{' after local");
-                    skipVariables();
+                    registerLocalVariables();
                     expect(TokenType.RBRACE, "Expected '}' after local variables");
                 }
                 
@@ -91,30 +91,30 @@ public class CodeGenerator {
 
     /**
      * Generate code for function definitions.
-     * FUNCDEFS ::= FDEF FUNCDEFS | ε
-     * FDEF ::= NAME ( PARAM ) { BODY ; return ATOM }
      */
     private void generateFuncDefs() {
         expect(TokenType.LBRACE, "Expected '{' to start func block");
         
         while (!isAtEnd() && !check(TokenType.RBRACE)) {
-            // Each function definition
             if (check(TokenType.IDENTIFIER)) {
                 String funcName = advance().getLexeme();
                 
-                // Parse parameters
+                // Parse parameters and map them
                 List<String> params = parseParamList();
+                List<String> mappedParams = new ArrayList<>();
+                for (String param : params) {
+                    mappedParams.add(varMapper.get(param));
+                }
                 
                 // Generate function header
-                emit("REM FUNC " + funcName + joinParams(params));
+                emit("REM FUNC " + funcName + joinParams(mappedParams));
                 
-                // Process BODY: local { MAXTHREE } ALGO ; return ATOM
                 expect(TokenType.LBRACE, "Expected '{' to start function body");
                 
                 // Optional local variables
                 if (match(TokenType.LOCAL)) {
                     expect(TokenType.LBRACE, "Expected '{' after local");
-                    skipVariables();
+                    registerLocalVariables();
                     expect(TokenType.RBRACE, "Expected '}' after local variables");
                 }
                 
@@ -140,13 +140,9 @@ public class CodeGenerator {
     
     /**
      * Generate ALGO block for functions - stops when it encounters 'return' keyword.
-     * This is different from regular ALGO blocks because in functions,
-     * the 'return' statement is not part of ALGO.
      */
     private void generateFuncAlgoBlock() {
-        // Read instructions until we hit 'return' or '}'
         while (!isAtEnd() && !check(TokenType.RBRACE) && !check(TokenType.RETURN)) {
-            // Also stop if we see a semicolon followed by return
             if (check(TokenType.SEMICOLON) && lookAhead(TokenType.RETURN)) {
                 break;
             }
@@ -158,15 +154,12 @@ public class CodeGenerator {
     }
 
     /**
-     * Parse parameter list: ( MAXTHREE )
-     * PARAM ::= MAXTHREE
-     * MAXTHREE ::= ε | VAR | VAR VAR | VAR VAR VAR
+     * Parse parameter list and return SPL names (will be mapped later).
      */
     private List<String> parseParamList() {
         expect(TokenType.LPAREN, "Expected '(' to start parameter list");
         List<String> params = new ArrayList<>();
         
-        // Up to 3 parameters
         while (!check(TokenType.RPAREN) && params.size() < 3) {
             if (check(TokenType.IDENTIFIER)) {
                 params.add(advance().getLexeme());
@@ -180,21 +173,23 @@ public class CodeGenerator {
     }
 
     /**
-     * Skip variable declarations (used for local variables)
+     * Register local variables with the mapper (just consume and register them).
      */
-    private void skipVariables() {
-        // VARIABLES ::= ε | VAR VARIABLES
+    private void registerLocalVariables() {
         while (!isAtEnd() && check(TokenType.IDENTIFIER) && !check(TokenType.RBRACE)) {
-            advance(); // skip variable name
+            String varName = advance().getLexeme();
+            // Register the variable (assigns a BASIC name)
+            varMapper.get(varName);
         }
     }
 
     /**
-     * Parse a single ATOM (variable or number)
+     * Parse a single ATOM (variable or number) and map if it's a variable.
      */
     private String parseAtom() {
         if (check(TokenType.IDENTIFIER)) {
-            return advance().getLexeme();
+            String varName = advance().getLexeme();
+            return varMapper.get(varName);
         }
         if (check(TokenType.NUMBER)) {
             return advance().getLexeme();
@@ -203,7 +198,7 @@ public class CodeGenerator {
     }
 
     /**
-     * Join parameters for display purposes
+     * Join parameters for display purposes.
      */
     private String joinParams(List<String> params) {
         if (params.isEmpty()) return "";
@@ -214,12 +209,10 @@ public class CodeGenerator {
 
     private void generateMain() {
         expect(TokenType.LBRACE, "Expected '{' to start main block");
-        // optional: var { ... }
         if (check(TokenType.VAR)) {
             advance(); // 'var'
             skipBraceBlock(); // ignore declarations
         }
-        // Generate ALGO until '}' of main
         while (!isAtEnd() && !check(TokenType.RBRACE)) {
             generateInstr();
             if (check(TokenType.SEMICOLON)) advance();
@@ -243,9 +236,7 @@ public class CodeGenerator {
 
         // branch: if TERM { ALGO } [ else { ALGO } ]
         if (match(TokenType.IF)) {
-            expect(TokenType.LPAREN, "Expected '(' after if");
             Expr cond = parseTermExpr();
-            expect(TokenType.RPAREN, "Expected ')' after if condition");
 
             String thenLabel = labels.newLabel("T");
             String exitLabel = labels.newLabel("E");
@@ -263,22 +254,21 @@ public class CodeGenerator {
                 expect(TokenType.RBRACE, "Expected '}' to end else-block");
             }
 
-            // Per rules: translate if (not TERM) by swapping then/else
+            // Handle 'not' by swapping branches
             if (cond.isNot) {
-                cond = cond.left; // unwrap not
+                cond = cond.left;
                 if (hasElse) {
                     List<String> tmp = thenCode;
                     thenCode = elseCode;
                     elseCode = tmp;
                 } else {
-                    // No else: treat as else-only by moving then-code to else branch
                     hasElse = true;
                     elseCode = thenCode;
                     thenCode = new ArrayList<>();
                 }
             }
 
-            // Normal case
+            // Emit IF structure
             if (hasElse) {
                 emitIf(cond, thenLabel);
                 emitList(elseCode);
@@ -296,12 +286,9 @@ public class CodeGenerator {
             return;
         }
 
-        // loops
         // while TERM { ALGO }
         if (match(TokenType.WHILE)) {
-            expect(TokenType.LPAREN, "Expected '(' after while");
             Expr cond = parseTermExpr();
-            expect(TokenType.RPAREN, "Expected ')' after while condition");
             String start = labels.newLabel("W");
             String body = labels.newLabel("WB");
             String exit = labels.newLabel("WE");
@@ -327,9 +314,7 @@ public class CodeGenerator {
             List<String> bodyCode = withBuffer(() -> generateAlgoBlock());
             expect(TokenType.RBRACE, "Expected '}' to end do-body");
             expect(TokenType.UNTIL, "Expected 'until' after do-body");
-            expect(TokenType.LPAREN, "Expected '(' after until");
             Expr cond = parseTermExpr();
-            expect(TokenType.RPAREN, "Expected ')' after until condition");
 
             emit("REM " + bodyLabel);
             emitList(bodyCode);
@@ -339,7 +324,7 @@ public class CodeGenerator {
             return;
         }
 
-        // Procedure call without return: NAME ( INPUT )
+        // Procedure call: NAME ( INPUT )
         if (check(TokenType.IDENTIFIER) && lookAhead(TokenType.LPAREN)) {
             String name = advance().getLexeme();
             List<String> args = parseInputList();
@@ -347,19 +332,21 @@ public class CodeGenerator {
             return;
         }
 
-        // Assignment: VAR = TERM  or VAR = NAME ( INPUT )
+        // Assignment: VAR = TERM or VAR = NAME ( INPUT )
         if (check(TokenType.IDENTIFIER) && lookAhead(TokenType.ASSIGN)) {
             String lhs = advance().getLexeme();
+            String mappedLhs = varMapper.get(lhs);
             expect(TokenType.ASSIGN, "Expected '=' in assignment");
-            // Function call with return? name(args)
+            
+            // Function call with return?
             if (check(TokenType.IDENTIFIER) && lookAhead(TokenType.LPAREN)) {
                 String fname = advance().getLexeme();
                 List<String> args = parseInputList();
-                emit("LET " + lhs + " = CALL " + fname + joinArgs(args));
+                emit("LET " + mappedLhs + " = CALL " + fname + joinArgs(args));
                 return;
             }
             Expr rhs = parseTermExpr();
-            emit("LET " + lhs + " = " + exprToString(rhs));
+            emit("LET " + mappedLhs + " = " + exprToString(rhs));
             return;
         }
 
@@ -367,27 +354,25 @@ public class CodeGenerator {
     }
 
     private void generateAlgoBlock() {
-        // Read instructions until '}' (caller consumes the '}')
         while (!isAtEnd() && !check(TokenType.RBRACE)) {
             generateInstr();
             if (check(TokenType.SEMICOLON)) advance();
         }
     }
 
-    // ---------- OUTPUT / TERM parsing ----------
-
+    /**
+     * Parse OUTPUT and map variables.
+     */
     private String parseOutput() {
-        // OUTPUT := string | ATOM
         if (check(TokenType.STRING)) {
             String s = advance().getLexeme();
-            // Ensure output is quoted
             if (!s.startsWith("\"")) s = "\"" + s;
             if (!s.endsWith("\"")) s = s + "\"";
             return s;
         }
-        // ATOM: var or number
         if (check(TokenType.IDENTIFIER)) {
-            return advance().getLexeme();
+            String varName = advance().getLexeme();
+            return varMapper.get(varName);
         }
         if (check(TokenType.NUMBER)) {
             return advance().getLexeme();
@@ -397,7 +382,7 @@ public class CodeGenerator {
 
     // --- Expression mini-AST ---
     private static class Expr {
-        String op;  // null => atom
+        String op;
         Expr left, right;
         String atom;
         boolean isNot = false;
@@ -414,19 +399,18 @@ public class CodeGenerator {
     }
 
     private Expr parseTermExpr() {
-        // TERM := ATOM | ( UNOP TERM ) | ( TERM BINOP TERM )
         if (check(TokenType.LPAREN)) {
             advance(); // (
             
             // Check for unary operators
             if (check(TokenType.NEG)) {
-                advance(); // consume 'neg'
+                advance();
                 Expr t = parseTermExpr();
                 expect(TokenType.RPAREN, "Expected ')' after unary TERM");
                 return new Expr("neg", t, null);
             }
             if (check(TokenType.NOT)) {
-                advance(); // consume 'not'
+                advance();
                 Expr t = parseTermExpr();
                 expect(TokenType.RPAREN, "Expected ')' after unary TERM");
                 Expr result = new Expr("not", t, null);
@@ -434,7 +418,7 @@ public class CodeGenerator {
                 return result;
             }
             
-            // Otherwise assume binary
+            // Binary expression
             Expr left = parseTermExpr();
             if (isBinOpPeek()) {
                 String op = readBinOp();
@@ -442,7 +426,6 @@ public class CodeGenerator {
                 expect(TokenType.RPAREN, "Expected ')' after binary TERM");
                 return new Expr(op, left, right);
             }
-            // Actually was a group: ( TERM )
             expect(TokenType.RPAREN, "Expected ')' to close group");
             return left;
         }
@@ -458,13 +441,14 @@ public class CodeGenerator {
                 String call = "CALL " + name + joinArgs(args);
                 return new Expr(call);
             }
-            return new Expr(advance().getLexeme());
+            // Map variable name
+            String varName = advance().getLexeme();
+            return new Expr(varMapper.get(varName));
         }
         
         throw error("Invalid TERM at " + where());
     }
 
-    // Check if current token is a binary operator
     private boolean isBinOpPeek() {
         return check(TokenType.PLUS) || check(TokenType.MINUS) || 
                check(TokenType.MULT) || check(TokenType.DIV) ||
@@ -472,7 +456,6 @@ public class CodeGenerator {
                check(TokenType.OR) || check(TokenType.AND);
     }
 
-    // Consume BINOP and return normalized string
     private String readBinOp() {
         if (match(TokenType.PLUS)) return "plus";
         if (match(TokenType.MINUS)) return "minus";
@@ -486,31 +469,29 @@ public class CodeGenerator {
     }
 
     private void emitIf(Expr cond, String trueLabel) {
-        // Lower boolean or/and by cascading IFs
         if ("or".equals(cond.op)) {
-            // IF left THEN trueLabel
             emitIf(cond.left, trueLabel);
-            // IF right THEN trueLabel
             emitIf(cond.right, trueLabel);
             return;
         }
         if ("and".equals(cond.op)) {
-            // For AND: need an intermediate label
             String mid = labels.newLabel("C");
             emitIf(cond.left, mid);
             emit("REM " + mid);
             emitIf(cond.right, trueLabel);
             return;
         }
-        // Base cases: eq, >, arithmetic comparisons, atom, call
         String condStr = exprToString(cond);
         emit("IF " + condStr + " THEN " + trueLabel);
     }
 
+    /**
+     * Convert expression to string. Variables are already mapped in the Expr.
+     */
     private String exprToString(Expr e) {
         if (e == null) return "";
         if (e.op == null) {
-            return e.atom;
+            return e.atom;  // Already mapped
         }
         if ("neg".equals(e.op)) {
             return "-" + exprToString(e.left);
@@ -556,13 +537,17 @@ public class CodeGenerator {
         for (String l : lines) emit(l);
     }
 
+    /**
+     * Parse input list and map variable arguments.
+     */
     private List<String> parseInputList() {
         expect(TokenType.LPAREN, "Expected '(' to start argument list");
         List<String> args = new ArrayList<>();
-        // Up to three params by grammar
+        
         while (!check(TokenType.RPAREN)) {
             if (check(TokenType.IDENTIFIER)) {
-                args.add(advance().getLexeme());
+                String varName = advance().getLexeme();
+                args.add(varMapper.get(varName));
             } else if (check(TokenType.NUMBER)) {
                 args.add(advance().getLexeme());
             } else {
@@ -592,7 +577,6 @@ public class CodeGenerator {
         if (depth != 0) throw error("Unclosed block");
     }
 
-    // Look ahead to next token type
     private boolean lookAhead(TokenType type) {
         int idx = current + 1;
         if (idx >= tokens.size()) return false;

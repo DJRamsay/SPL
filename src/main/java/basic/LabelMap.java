@@ -31,4 +31,13 @@ public class LabelMap {
         }
         return map.get(label);
     }
+
+    /**
+     * Checks if a label exists in the map.
+     * @param label The symbolic label to check.
+     * @return true if the label is mapped, false otherwise.
+     */
+    public boolean containsLabel(String label) {
+        return map.containsKey(label);
+    }
 }

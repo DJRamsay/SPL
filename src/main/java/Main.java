@@ -22,7 +22,7 @@ public class Main {
         try {
             // === Read Input ===
             if (args.length < 1) {
-                String defaultInput = "src/main/java/input2.txt";
+                String defaultInput = "src/main/java/input4.txt";
                 System.out.println("No arguments provided. Reading from " + defaultInput);
                 source = readFile(defaultInput);
             } else {
@@ -91,6 +91,12 @@ public class Main {
                 targetCode = gen.generate();
                 writeFile(INTERMEDIATE_CODE_PATH, targetCode);
                 System.out.println("- Code generation complete");
+                
+                // Print the intermediate code
+                System.out.println("\n---- Intermediate Code ----");
+                System.out.println(targetCode);
+                System.out.println("---------------------------");
+                
             } catch (Exception e) {
                 System.err.println("Code generation error: " + e.getMessage());
                 e.printStackTrace();
