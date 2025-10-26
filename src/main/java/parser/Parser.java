@@ -27,9 +27,9 @@ public class Parser {
      * Starts the parsing process by calling the top-level rule, SPL_PROG.
      */
     public void parse() throws ParserException {
-        System.out.println("Starting SPL parsing...");
+        // System.out.println("Starting SPL parsing...");
         parseSPL_PROG(); 
-        System.out.println("SPL Parsing successful!");
+        // System.out.println("SPL Parsing successful!");
     }
 
     // --- Core Token Management Helper Methods ---

@@ -14,7 +14,7 @@ import parser.ParserException;
 
 public class Main {
 
-    private static final String INTERMEDIATE_CODE_PATH = "/target_code.txt";
+    private static final String INTERMEDIATE_CODE_PATH = "target/target_code.txt";
 
     public static void main(String args[]) throws IOException {
         String source;
@@ -30,37 +30,27 @@ public class Main {
             }
 
             // === 1. Lexical Analysis ===
-            System.out.println("====Lexical Analysis====");
             Lexer lexer = new Lexer(source);
             List<Token> tokens = lexer.tokenize();
-            System.out.println("Tokens generated: " + tokens.size());
+            System.out.println("- Lexical analysis complete");
 
-            // Debug: print source with line numbers
-            System.out.println("---- Source (numbered) ----");
-            String[] lines = source.split("\\R");
-            for (int i = 0; i < lines.length; i++) {
-                System.out.printf("%3d: %s%n", i + 1, lines[i]);
-            }
-            
             // === 2. Syntax Analysis (Parsing) ===
-            System.out.println("\n====Syntax Analysis (Parsing)====");
             try {
                 Parser parser = new Parser(tokens);
                 parser.parse();
-                System.out.println("Syntax is correct");
+                System.out.println("- Syntax analysis complete");
             } catch (ParserException pe) {
                 System.err.println("Parse error: " + pe.getMessage());
                 System.exit(1);
             }
 
             // === 3. Semantic Analysis - Scope ===
-            System.out.println("\n====Semantic Analysis: Scope====");
             try {
                 semantic.ScopeAnalyzer scopeAnalyzer = new semantic.ScopeAnalyzer(tokens);
                 semantic.ScopeAnalyzer.ScopeAnalysisResult scopeResult = scopeAnalyzer.analyze();
                 
                 if (scopeResult.isSuccess()) {
-                    System.out.println("Scope analysis passed");
+                    System.out.println("- Scope analysis complete");
                 } else {
                     System.err.println("Scope errors found:");
                     for (String error : scopeResult.getErrors()) {
@@ -75,13 +65,12 @@ public class Main {
             }
 
             // === 4. Semantic Analysis - Type ===
-            System.out.println("\n====Semantic Analysis: Type====");
             try {
                 semantic.TypeAnalyzer typeAnalyzer = new semantic.TypeAnalyzer(tokens);
                 semantic.TypeAnalyzer.TypeAnalysisResult typeResult = typeAnalyzer.analyze();
                 
                 if (typeResult.isSuccess()) {
-                    System.out.println("Type analysis passed");
+                    System.out.println("- Type analysis complete");
                 } else {
                     System.err.println("Type errors found:");
                     for (String error : typeResult.getErrors()) {
@@ -95,64 +84,46 @@ public class Main {
                 System.exit(1);
             }
 
-            // === 5. Code Generation (UN-NUMBERED INTERMEDIATE CODE) ===
-            System.out.println("\n====Code Generation (Un-numbered)====");
+            // === 5. Code Generation ===
             String targetCode;
             try {
                 CodeGenerator gen = new CodeGenerator(tokens);
                 targetCode = gen.generate();
-                
-                System.out.println("---- Target Code ----");
-                System.out.println(targetCode);
-                System.out.println("---- End Target Code ----");
-
-                // Save target code to file
                 writeFile(INTERMEDIATE_CODE_PATH, targetCode);
-                System.out.println("\nUn-numbered intermediate code saved to: " + INTERMEDIATE_CODE_PATH);
-                
+                System.out.println("- Code generation complete");
             } catch (Exception e) {
                 System.err.println("Code generation error: " + e.getMessage());
                 e.printStackTrace();
                 System.exit(1);
             }
             
-            // ----------------------------------------------------------------------
-            // === 6. POST-PROCESSING STEP (Reads File -> Transforms -> Writes File) ===
-            // ----------------------------------------------------------------------
-            
-            System.out.println("\n====Post-Processing (Line Numbering & Jumps)====");
-            
+            // === 6. Post-Processing ===
             try {
-                // A. READ: Read the un-numbered code back from the file, splitting it into lines
                 List<String> intermediateCodeLines = Files.readAllLines(
                     Paths.get(INTERMEDIATE_CODE_PATH), 
                     StandardCharsets.US_ASCII
                 );
                 
-                // B. PROCESS: Use BasicPostProcessor to perform the transformation
                 BasicPostProcessor postProcessor = new BasicPostProcessor();
                 List<String> finalBasicCodeLines = postProcessor.generateExecutableBasic(intermediateCodeLines);
-                
-                // Convert the list of final BASIC lines back into a single string
                 String finalExecutableCode = String.join(System.lineSeparator(), finalBasicCodeLines);
 
-                // C. WRITE: Overwrite the file with the final, executable BASIC code
                 writeFile(INTERMEDIATE_CODE_PATH, finalExecutableCode);
+                System.out.println("- Post-processing complete");
                 
-                System.out.println("---- Final Executable BASIC Code ----");
+                System.out.println("\n" + "=".repeat(60));
+                System.out.println("COMPILATION SUCCESSFUL");
+                System.out.println("=".repeat(60));
+                System.out.println("\n---- BASIC OUTPUT ----");
                 System.out.println(finalExecutableCode);
-                System.out.println("Final executable code saved to: " + INTERMEDIATE_CODE_PATH);
+                System.out.println("----------------------");
+                System.out.println("\nOutput saved to: " + INTERMEDIATE_CODE_PATH);
+                System.out.println("\nRun your code online at: https://www.quitebasic.com/");
             } catch (Exception e) {
                 System.err.println("Post-processing error: " + e.getMessage());
                 e.printStackTrace();
                 System.exit(1);
             }
-
-
-            // === Compilation Successful ===
-            System.out.println("\n========================================");
-            System.out.println("COMPILATION SUCCESSFUL");
-            System.out.println("========================================");
 
         } catch (LexerException e) {
             System.err.println("Lexical error: " + e.getMessage());
