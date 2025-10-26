@@ -228,7 +228,6 @@ public class TypeAnalyzer {
         
         // Check NAME is type-less (not a variable)
         checkNameIsTypeless(funcName);
-        
         addToSymbolTable(funcName, DataType.TYPELESS, null);
         
         currentContext = funcName;
@@ -238,9 +237,17 @@ public class TypeAnalyzer {
         expect(TokenType.RPAREN, "Expected ')' after parameters");
         
         expect(TokenType.LBRACE, "Expected '{' to start function body");
-        analyzeBODY();
-        expect(TokenType.SEMICOLON, "Expected ';' before return");
-        expect(TokenType.RETURN, "Expected 'return' in function");
+        
+        // Parse BODY ::= local { MAXTHREE } ALGO
+        expect(TokenType.LOCAL, "Expected 'local' keyword");
+        expect(TokenType.LBRACE, "Expected '{' after local");
+        analyzeMAXTHREE();
+        expect(TokenType.RBRACE, "Expected '}' after local variables");
+
+        analyzeALGO();
+        
+        expect(TokenType.SEMICOLON, "Expected ';' after function body before return");
+        expect(TokenType.RETURN, "Expected 'return' keyword in function");
         
         DataType atomType = analyzeATOM();
         if (atomType != DataType.NUMERIC) {
@@ -296,10 +303,12 @@ public class TypeAnalyzer {
     private void analyzeALGO() throws TypeException {
         analyzeINSTR();
         
-        while (match(TokenType.SEMICOLON)) {
-            if (check(TokenType.RBRACE) || check(TokenType.RETURN)) {
-                break;
+        while (check(TokenType.SEMICOLON)) {
+            if (lookahead(1).getType() == TokenType.RETURN || 
+                lookahead(1).getType() == TokenType.RBRACE) {
+                break;  
             }
+            advance();
             analyzeINSTR();
         }
     }

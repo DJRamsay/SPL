@@ -73,12 +73,8 @@ public class ScopeAnalyzerTest {
         List<Token> tokens = createTokens(
             TokenType.GLOB, "glob",
             TokenType.LBRACE, "{",
-            TokenType.VAR, "var",
             TokenType.IDENTIFIER, "x",
-            TokenType.SEMICOLON, ";",
-            TokenType.VAR, "var",
             TokenType.IDENTIFIER, "y",
-            TokenType.SEMICOLON, ";",
             TokenType.RBRACE, "}",
             TokenType.PROC, "proc",
             TokenType.LBRACE, "{",
@@ -99,8 +95,8 @@ public class ScopeAnalyzerTest {
         ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
         ScopeAnalysisResult result = analyzer.analyze();
         
-        // assertTrue("Program with global variables should be valid", result.isSuccess());
-        assertTrue("Should have no errors, but found: " + result.getErrors(), result.getErrors().isEmpty());        
+        assertTrue("Program with global variables should be valid", result.isSuccess());
+        // assertTrue("Should have no errors, but found: " + result.getErrors(), result.getErrors().isEmpty());        
 
     }
     
@@ -667,7 +663,7 @@ public void testVariableFunctionNameConflict() throws Exception {
      */
     @Test
     public void testSameNameInDifferentScopes() throws Exception {
-        String source = "glob { x ; } proc { myproc ( ) { local { x ; } x = 1 ; } } func { } main { var { x ; } x = 2 ; halt }";
+        String source = "glob { x } proc { myproc ( ) { local { x } x = 1 } } func { } main { var { x ; } x = 2 ; halt }";
         List<Token> tokens = new Lexer(source).tokenize();
         ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
         ScopeAnalysisResult result = analyzer.analyze();
@@ -689,7 +685,7 @@ public void testVariableFunctionNameConflict() throws Exception {
      */
     @Test
     public void testValidParameterUsage() throws Exception {
-        String source = "glob { } proc { myproc ( a b ) { local { } a = 1 ; b = 2 ; } } func { } main { var { } halt }";
+        String source = "glob { } proc { myproc ( a b ) { local { } a = 1 ; b = 2 } } func { } main { var { } halt }";
         List<Token> tokens = new Lexer(source).tokenize();
         ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
         ScopeAnalysisResult result = analyzer.analyze();
@@ -702,7 +698,7 @@ public void testVariableFunctionNameConflict() throws Exception {
      */
     @Test
     public void testValidFunctionReturn() throws Exception {
-        String source = "glob { } proc { } func { myfunc ( ) { local { } ; return 1 } } main { var { x ; } x = myfunc ( ) ; halt }";
+        String source = "glob { } proc { } func { myfunc ( ) { local { } halt ; return 1 } } main { var { x } x = myfunc ( ) ; halt }";
         List<Token> tokens = new Lexer(source).tokenize();
         ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
         ScopeAnalysisResult result = analyzer.analyze();
@@ -759,7 +755,7 @@ public void testVariableFunctionNameConflict() throws Exception {
      */
     @Test
     public void testGlobalVariableAccessInProcedure() throws Exception {
-        String source = "glob { globalVar ; } proc { myproc ( ) { local { } globalVar = 5 ; } } func { } main { var { } halt }";
+        String source = "glob { globalVar } proc { myproc ( ) { local { } globalVar = 5 } } func { } main { var { } halt }";
         List<Token> tokens = new Lexer(source).tokenize();
         ScopeAnalyzer analyzer = new ScopeAnalyzer(tokens);
         ScopeAnalysisResult result = analyzer.analyze();
@@ -821,15 +817,15 @@ public void testVariableFunctionNameConflict() throws Exception {
 @Test
 public void testFunctionCallInExpression() throws Exception {
     String source = "glob { } " +
-            "proc { } " +
-            "func { " +
-            "  add ( a b ) { local { } ; return ( a plus b ) } " +
-            "} " +
-            "main { " +
-            "  var { result ; } " +
-            "  result = add ( 5 3 ) ; " +
-            "  halt " +
-            "}";
+        "proc { } " +
+        "func { " +
+        "  add ( a b ) { local { sum } sum = ( a plus b ) ; return sum } " +
+        "} " +
+        "main { " +
+        "  var { result } " +
+        "  result = add ( 5 3 ) ; " +
+        "  halt " +
+        "}";
     List<Token> tokens = new Lexer(source).tokenize();
     
     // DEBUG: Print tokens around the assignment
@@ -862,7 +858,7 @@ public void testFunctionCallInExpression() throws Exception {
         String source = "glob { } " +
                 "proc { } " +
                 "func { " +
-                "  simple ( ) { local { } ; return 1 } " +  // Simple function
+                "  simple ( ) { local { } halt ; return 1 } " +  // Simple function
                 "} " +
                 "main { " +
                 "  var { } " +
@@ -880,7 +876,7 @@ public void testFunctionCallInExpression() throws Exception {
         String source = "glob { } " +
                 "proc { } " +
                 "func { " +
-                "  getValue ( ) { local { } ; return 42 } " +
+                "  getValue ( ) { local { } halt ; return 42 } " +
                 "} " +
                 "main { " +
                 "  var { result ; } " +

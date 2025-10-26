@@ -444,6 +444,8 @@ public class ScopeAnalyzer {
         
         expect(TokenType.RBRACE, "Expected '}' after local variables");
         
+        analyzeALGO();
+
         // Parse: ; return ATOM
         expect(TokenType.SEMICOLON, "Expected ';' before return");
         expect(TokenType.RETURN, "Expected 'return' in function");
@@ -559,12 +561,14 @@ public class ScopeAnalyzer {
             }
             
             if (check(TokenType.SEMICOLON)) {
-                advance(); // consume the semicolon
-                
-                if (check(TokenType.RBRACE) || check(TokenType.RETURN) || check(TokenType.EOF)) {
-                    break;
+                // Look ahead to see what comes after the semicolon
+                if (lookahead(1).getType() == TokenType.RETURN || 
+                    lookahead(1).getType() == TokenType.RBRACE || 
+                    lookahead(1).getType() == TokenType.EOF) {
+                    break;  // Don't consume the semicolon - let parent handle it
                 }
                 
+                advance(); // NOW consume the semicolon
                 analyzeINSTR();
             } else {
                 TokenType currentType = peek().getType();
