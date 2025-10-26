@@ -177,10 +177,8 @@ public class Parser {
     private void parseMAXTHREE() throws ParserException {
         int count = 0;
         // This rule is defined by the contents inside the 'local {}' block.
-        while (check(TokenType.VAR) && count < 3) {
-            match(TokenType.VAR);
+        while (check(TokenType.IDENTIFIER) && count < 3) {
             parseNAME();
-            expect(TokenType.SEMICOLON, "Expected ';' after local VAR declaration.");
             count++;
         }
     }
